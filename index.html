@@ -136,6 +136,14 @@
 
   .col-objeto{min-width:300px;max-width:420px;}
   .col-serv{min-width:200px;}
+  .doc-item{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border:1px solid var(--border);border-radius:8px;margin-bottom:8px;background:var(--bg);font-size:.8rem;}
+  .doc-item.destaque{border-color:var(--accent);background:var(--accent-dim);}
+  .doc-item .doc-nome{display:flex;flex-direction:column;gap:2px;min-width:0;}
+  .doc-item .doc-nome b{word-break:break-word;}
+  .doc-item .doc-acoes{display:flex;gap:6px;flex-shrink:0;}
+  .doc-falta{padding:10px 12px;border:1px dashed var(--warning);border-radius:8px;margin-bottom:8px;font-size:.78rem;color:var(--warning);}
+  .doc-add{display:grid;grid-template-columns:1fr 1fr auto;gap:8px;margin-top:6px;}
+  .doc-add input{background:var(--bg);border:1px solid var(--border);padding:8px 10px;border-radius:8px;font-family:inherit;font-size:.8rem;min-width:0;}
   .regiao-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
   #btn-so-regiao.on{background:var(--lime);color:#fff;border-color:var(--lime);}
   .dist{display:inline-block;margin-top:4px;font-size:.66rem;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;}
@@ -515,6 +523,36 @@
   </div>
 </div>
 <datalist id="dl-municipios"></datalist>
+
+<!-- MODAL: documentos da licitação -->
+<div class="modal-backdrop" id="modal-docs">
+  <div class="modal" style="max-width:680px;">
+    <div class="modal-head">
+      <div>
+        <h2>Documentos da licitação</h2>
+        <div class="muted small" id="docs-sub" style="margin-top:4px;"></div>
+      </div>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="docs-principais"></div>
+      <div class="modal-section-title" id="docs-outros-titulo" style="display:none;"><span>Outros arquivos</span></div>
+      <div id="docs-outros"></div>
+      <div class="modal-section-title"><span>Links adicionados pela equipe</span></div>
+      <div id="docs-manuais"></div>
+      <div class="doc-add">
+        <input type="text" id="doc-titulo" placeholder="Nome (ex: Planilha orçamentária — Drive da prefeitura)">
+        <input type="text" id="doc-url" placeholder="https://...">
+        <button class="btn btn-ghost btn-sm" id="doc-add-btn" type="button">Adicionar</button>
+      </div>
+      <p class="muted small" id="docs-nota" style="margin-top:12px;"></p>
+    </div>
+    <div class="modal-foot">
+      <span class="muted small">Os arquivos do PNCP baixam direto do portal oficial.</span>
+      <button class="btn btn-accent" data-close>Fechar</button>
+    </div>
+  </div>
+</div>
 
 <!-- MODAL: atestados exigidos -->
 <div class="modal-backdrop" id="modal-atest">
@@ -1146,6 +1184,117 @@ function abrirAtestados(id) {
   document.getElementById("modal-atest").classList.add("open");
 }
 
+/* ------------------------------ documentos (edital, planilha...) ------------------------------ */
+const RX_DOC_PLANILHA = /planilha|orcament|composic|\bbdi\b|cronograma|curva abc|quantitativ/;
+let docsId = null;
+
+function pncpCompra(l) {
+  const m = (l.pncp?.linkPncp || "").match(/editais\/(\d+)\/(\d+)\/(\d+)/);
+  return m ? { cnpj: m[1], ano: m[2], seq: m[3] } : null;
+}
+function docItemHtml(titulo, sub, url, destaque) {
+  return `<div class="doc-item ${destaque ? "destaque" : ""}">
+    <div class="doc-nome"><b>${escapeHtml(titulo)}</b>${sub ? `<span class="muted small">${escapeHtml(sub)}</span>` : ""}</div>
+    <div class="doc-acoes"><a class="icon-btn" href="${escapeHtml(url)}" target="_blank" rel="noopener">Abrir / baixar</a></div>
+  </div>`;
+}
+function renderDocsManuais(l) {
+  const lista = l.documentos || [];
+  document.getElementById("docs-manuais").innerHTML = lista.length ? lista.map((d, i) => `
+    <div class="doc-item">
+      <div class="doc-nome"><b>${escapeHtml(d.titulo || "Link")}</b><span class="muted small">${escapeHtml(d.url)}</span></div>
+      <div class="doc-acoes">
+        <a class="icon-btn" href="${escapeHtml(safeUrl(d.url))}" target="_blank" rel="noopener">Abrir</a>
+        <button class="icon-btn" data-doc-del="${i}" title="Remover link">✕</button>
+      </div>
+    </div>`).join("") : `<div class="muted small" style="margin-bottom:6px;">Nenhum link adicionado. Use para planilhas que só estão no Drive da prefeitura, no site do DER etc.</div>`;
+}
+
+async function abrirDocumentos(id) {
+  const l = licitacoes.find(x => x.id === id);
+  if (!l) return;
+  docsId = id;
+  document.getElementById("docs-sub").textContent = `${l.cidade || ""} · ${l.orgao || ""} · ${l.numero || ""}`;
+  const principais = document.getElementById("docs-principais");
+  const outros = document.getElementById("docs-outros");
+  const outrosTitulo = document.getElementById("docs-outros-titulo");
+  outros.innerHTML = ""; outrosTitulo.style.display = "none";
+  renderDocsManuais(l);
+  const pend = (l.preenchidoAuto || "").match(/Pend[eê]ncias?:\s*(.*)$/i);
+  const notaPlanilha = pend && /planilha/i.test(pend[1]) ? `Observação da leitura do edital: ${pend[1]}` : "";
+  document.getElementById("docs-nota").textContent = "";
+  document.getElementById("modal-docs").classList.add("open");
+
+  const extras = [];
+  if (safeUrl(l.linkPortal)) extras.push(docItemHtml("Portal de origem da licitação", l.linkPortal, l.linkPortal, false));
+  if (safeUrl(l.alerta?.link)) extras.push(docItemHtml("Página no Alerta Licitação", "", l.alerta.link, false));
+
+  const c = pncpCompra(l);
+  if (!c) {
+    document.getElementById("docs-nota").textContent = notaPlanilha;
+    principais.innerHTML = (l.origem === "ALERTA"
+      ? `<div class="doc-falta">Licitação vinda do Alerta Licitação: os arquivos ficam no portal de origem ou na página do Alerta.</div>`
+      : `<div class="doc-falta">Licitação cadastrada à mão: adicione abaixo os links do edital e da planilha.</div>`) + extras.join("");
+    return;
+  }
+  principais.innerHTML = `<div class="muted small" style="padding:8px 0;">Buscando os arquivos no PNCP…</div>`;
+  try {
+    const r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${c.cnpj}/compras/${c.ano}/${c.seq}/arquivos`);
+    if (!r.ok) throw new Error("HTTP " + r.status);
+    const arqs = (await r.json()).filter(a => a.statusAtivo !== false)
+      .map(a => ({ titulo: a.titulo || "arquivo", tipo: a.tipoDocumentoNome || "", data: (a.dataPublicacaoPncp || "").slice(0, 10),
+        url: `https://pncp.gov.br/pncp-api/v1/orgaos/${c.cnpj}/compras/${c.ano}/${c.seq}/arquivos/${a.sequencialDocumento}` }));
+    const ehEdital = a => /edital/i.test(a.tipo) || /edital/i.test(norm(a.titulo));
+    const ehPlanilha = a => RX_DOC_PLANILHA.test(norm(a.titulo + " " + a.tipo));
+    const editais = arqs.filter(ehEdital), planilhas = arqs.filter(a => !ehEdital(a) && ehPlanilha(a));
+    const resto = arqs.filter(a => !editais.includes(a) && !planilhas.includes(a));
+    const sub = a => [a.tipo, a.data ? "publicado em " + a.data.split("-").reverse().join("/") : ""].filter(Boolean).join(" · ");
+    let html = editais.map(a => docItemHtml("Edital — " + a.titulo, sub(a), a.url, true)).join("");
+    const compactados = arqs.filter(a => /\.(zip|rar|7z)$/i.test(a.titulo) || /anexo/i.test(norm(a.titulo)));
+    html += planilhas.length
+      ? planilhas.map(a => docItemHtml("Planilha — " + a.titulo, sub(a), a.url, true)).join("")
+      : `<div class="doc-falta">Nenhuma planilha orçamentária separada no PNCP. ${compactados.length
+          ? `Ela deve estar dentro dos anexos: ${escapeHtml(compactados.map(a => a.titulo).join(", "))}.`
+          : "Ela pode estar dentro do edital (anexos no fim do PDF) ou só no portal de origem."}</div>`;
+    if (!planilhas.length) document.getElementById("docs-nota").textContent = notaPlanilha;
+    principais.innerHTML = html + extras.join("");
+    if (resto.length) {
+      outrosTitulo.style.display = "flex";
+      outros.innerHTML = resto.map(a => docItemHtml(a.titulo, sub(a), a.url, false)).join("");
+    }
+  } catch (e) {
+    principais.innerHTML = `<div class="doc-falta">Não foi possível buscar os arquivos no PNCP agora (${escapeHtml(e.message)}).</div>`
+      + docItemHtml("Abrir a página da licitação no PNCP", "", l.pncp.linkPncp, true) + extras.join("");
+  }
+}
+
+async function adicionarDocumento() {
+  const l = licitacoes.find(x => x.id === docsId);
+  if (!l) return;
+  const titulo = document.getElementById("doc-titulo").value.trim();
+  const url = document.getElementById("doc-url").value.trim();
+  if (!safeUrl(url)) { toast("Cole um link começando com http:// ou https://", true); return; }
+  if (!requireUnlock()) return;
+  const documentos = [...(l.documentos || []), { titulo: titulo || "Link", url }];
+  try {
+    await store.update(l.id, { documentos });
+    l.documentos = documentos;
+    document.getElementById("doc-titulo").value = ""; document.getElementById("doc-url").value = "";
+    renderDocsManuais(l);
+    toast("Link adicionado.");
+  } catch (e) { toast(e.message || "Erro ao salvar o link.", true); }
+}
+async function removerDocumento(i) {
+  const l = licitacoes.find(x => x.id === docsId);
+  if (!l || !confirm("Remover este link?") || !requireUnlock()) return;
+  const documentos = (l.documentos || []).filter((_, j) => j !== i);
+  try {
+    await store.update(l.id, { documentos });
+    l.documentos = documentos;
+    renderDocsManuais(l);
+  } catch (e) { toast(e.message || "Erro ao remover o link.", true); }
+}
+
 function objetoBadges(l) {
   const p = fonte(l);
   const b = [];
@@ -1189,6 +1338,7 @@ function renderTabela() {
       <td>${escapeHtml(l.vencedora)}</td>
       <td class="no-print"><div class="row-actions">
         <button class="icon-btn" data-edit="${escapeHtml(l.id)}" title="Editar / preencher">Editar</button>
+        <button class="icon-btn" data-docs="${escapeHtml(l.id)}" title="Edital, planilha e demais arquivos">Documentos</button>
         ${linkPncp ? `<a class="icon-btn" href="${escapeHtml(linkPncp)}" target="_blank" rel="noopener" title="Abrir no PNCP (edital e anexos)">PNCP</a>` : ""}
         ${linkAlerta ? `<a class="icon-btn" href="${escapeHtml(linkAlerta)}" target="_blank" rel="noopener" title="Abrir no Alerta Licitação">Alerta</a>` : ""}
         ${linkPortal ? `<a class="icon-btn" href="${escapeHtml(linkPortal)}" target="_blank" rel="noopener" title="Abrir portal de origem">Portal</a>` : ""}
@@ -1712,6 +1862,10 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
 document.addEventListener("click", e => {
   const intBtn = e.target.closest(".int-btn[data-int]");
   if (intBtn) { setInteresse(intBtn.dataset.id, intBtn.dataset.int); return; }
+  const docs = e.target.closest("[data-docs]");
+  if (docs) { abrirDocumentos(docs.dataset.docs); return; }
+  const docDel = e.target.closest("[data-doc-del]");
+  if (docDel) { removerDocumento(Number(docDel.dataset.docDel)); return; }
   const atest = e.target.closest("[data-atest]");
   if (atest) { abrirAtestados(atest.dataset.atest); return; }
   const edit = e.target.closest("[data-edit]");
@@ -1755,6 +1909,7 @@ document.getElementById("btn-so-regiao").addEventListener("click", () => {
 });
 try { soRegiao = localStorage.getItem("licSoRegiao") === "1"; } catch {}
 document.getElementById("btn-regioes").addEventListener("click", abrirRegioes);
+document.getElementById("doc-add-btn").addEventListener("click", adicionarDocumento);
 document.getElementById("reg-add").addEventListener("click", () => document.getElementById("reg-linhas").insertAdjacentHTML("beforeend", regLinhaHtml()));
 document.getElementById("reg-linhas").addEventListener("click", e => { if (e.target.closest(".rg-del")) e.target.closest(".reg-row").remove(); });
 document.getElementById("reg-salvar").addEventListener("click", salvarRegioes);
