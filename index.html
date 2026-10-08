@@ -509,7 +509,7 @@
       <button class="modal-close" data-close>✕</button>
     </div>
     <div class="modal-body">
-      <p class="muted small" style="margin-bottom:14px;">Uma licitação está "na região" quando o município fica dentro do raio de pelo menos uma cidade-base. A distância é em <b>linha reta</b> entre os municípios (a rodoviária costuma ser 20–30% maior). Órgãos estaduais/consórcios sem município definido aparecem sempre, marcados como "local a conferir".</p>
+      <p class="muted small" style="margin-bottom:14px;">Uma licitação está "na região" quando o município fica dentro do raio de pelo menos uma cidade-base. A distância é em <b>linha reta</b> entre os municípios (a rodoviária costuma ser 20–30% maior). Nos órgãos estaduais (DER-MG, SEINFRA) e consórcios, o local da obra é lido nos municípios citados no objeto; se o objeto não cita nenhum, a licitação aparece sempre, marcada como "local a conferir".</p>
       <div id="reg-linhas"></div>
       <button class="btn btn-ghost btn-sm" id="reg-add" type="button" style="width:100%;justify-content:center;border-style:dashed;color:var(--accent);">+ Adicionar cidade-base</button>
     </div>
@@ -811,13 +811,25 @@ const REGIOES_PADRAO = [
 ];
 let municipios = {};          // ibge -> [nome, lat, lon]
 let municipioPorNome = {};    // nome normalizado -> ibge
+let municipiosPalavras = [];  // [{ chave: "couto magalhaes de minas", ibge }] para achar cidades dentro do objeto
 let regioes = REGIOES_PADRAO;
+// nomes de município que também são palavras comuns no texto de um objeto
+const NOMES_AMBIGUOS = new Set(["luz", "fama", "prata", "campanha", "formoso", "bandeira", "central minas", "brasilia minas"]);
+// editais escrevem "Couto Magalhães de Minas" para "Couto de Magalhães de Minas": compara sem de/do/da
+function semConectores(s) { return (" " + s + " ").replace(/ (de|do|da|dos|das|d) /g, " ").replace(/ (de|do|da|dos|das|d) /g, " ").trim(); }
 
 async function carregarMunicipios() {
   try {
     municipios = await fetch("municipios-mg.json").then(r => r.json());
     municipioPorNome = {};
-    for (const [ibge, [nome]] of Object.entries(municipios)) municipioPorNome[norm(nome)] = ibge;
+    municipiosPalavras = [];
+    for (const [ibge, [nome]] of Object.entries(municipios)) {
+      municipioPorNome[norm(nome)] = ibge;
+      const chave = semConectores(norm(nome).replace(/[^a-z0-9]+/g, " ").trim());
+      if (!NOMES_AMBIGUOS.has(chave)) municipiosPalavras.push({ chave, ibge });
+    }
+    // nomes maiores primeiro: "Ouro Preto" não pode ser lido como "Ouro"
+    municipiosPalavras.sort((a, b) => b.chave.length - a.chave.length);
     document.getElementById("dl-municipios").innerHTML = Object.values(municipios).map(m => `<option value="${escapeHtml(m[0])}">`).join("");
   } catch (e) { console.error("Falha ao carregar municípios:", e); }
 }
@@ -829,33 +841,63 @@ function distanciaKm(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
-// município da licitação: pelo código IBGE quando a fonte informa; senão pelo nome da cidade.
-// Órgãos estaduais/consórcios ficam com "(sede do órgão)" e não têm local de obra definido.
-function municipioDe(l) {
-  const ibge = fonte(l).ibge || l.alerta?.municipioIbge;
-  if (ibge && municipios[ibge]) return municipios[ibge];
-  const cidade = l.cidade || "";
-  if (/sede do/i.test(cidade)) return null;
-  const chave = municipioPorNome[norm(cidade.replace(/\(.*?\)/g, "").replace(/\s*[-/]\s*mg\s*$/i, "").trim())];
-  return chave ? municipios[chave] : null;
+// órgãos estaduais (DER-MG, SEINFRA) e consórcios: o PNCP traz a cidade-sede do órgão, não a da obra
+function ehSedeDoOrgao(l) {
+  const esfera = fonte(l).esfera;
+  return /sede do/i.test(l.cidade || "") || (!!esfera && esfera !== "Municipal");
+}
+// municípios de MG citados no objeto, na ordem em que aparecem ("Trecho: Ouro Preto - Ouro Branco")
+function municipiosNoObjeto(objeto) {
+  let texto = " " + semConectores(norm(objeto).replace(/[^a-z0-9]+/g, " ")) + " ";
+  const achados = [];
+  for (const m of municipiosPalavras) {
+    const pos = texto.indexOf(" " + m.chave + " ");
+    if (pos < 0) continue;
+    achados.push({ pos, ibge: m.ibge });
+    // apaga o trecho para um nome menor contido nele não ser contado de novo
+    texto = texto.slice(0, pos) + " ".repeat(m.chave.length + 1) + texto.slice(pos + m.chave.length + 1);
+  }
+  return achados.sort((a, b) => a.pos - b.pos).map(a => a.ibge);
+}
+// municípios da obra: pelo IBGE ou nome da cidade; nos órgãos estaduais, pelos citados no objeto
+const municipiosCache = new Map();
+function municipiosDe(l) {
+  if (municipiosCache.has(l.id)) return municipiosCache.get(l.id);
+  let lista = [];
+  if (ehSedeDoOrgao(l)) lista = municipiosNoObjeto(l.objeto);
+  else {
+    const ibge = fonte(l).ibge || l.alerta?.municipioIbge;
+    if (ibge && municipios[ibge]) lista = [ibge];
+    else {
+      const chave = municipioPorNome[norm((l.cidade || "").replace(/\(.*?\)/g, "").replace(/\s*[-/]\s*mg\s*$/i, "").trim())];
+      if (chave) lista = [chave];
+    }
+  }
+  municipiosCache.set(l.id, lista);
+  return lista;
+}
+function cidadeExibicao(l) {
+  if (!ehSedeDoOrgao(l)) return l.cidade || "";
+  const lista = municipiosDe(l);
+  return lista.length ? lista.slice(0, 3).map(i => municipios[i][0]).join(" / ") + (lista.length > 3 ? " …" : "") : (l.cidade || "");
 }
 
 const regiaoCache = new Map();
 function regiaoDe(l) {
   if (regiaoCache.has(l.id)) return regiaoCache.get(l.id);
-  const m = municipioDe(l);
-  let info = null;
-  if (m) {
-    let melhor = null;
+  let melhor = null;
+  // com vários municípios (trecho de rodovia), vale o mais próximo de uma cidade-base
+  for (const ibge of municipiosDe(l)) {
+    const m = municipios[ibge];
     for (const r of regioes) {
       const base = municipios[r.ibge];
       if (!base) continue;
       const d = distanciaKm(m, base);
       const folga = d - r.raio;
-      if (!melhor || folga < melhor.folga) melhor = { d, folga, base: r.cidade, raio: r.raio };
+      if (!melhor || folga < melhor.folga) melhor = { d, folga, base: r.cidade };
     }
-    if (melhor) info = { km: Math.round(melhor.d), base: melhor.base, dentro: melhor.folga <= 0 };
   }
+  const info = melhor ? { km: Math.round(melhor.d), base: melhor.base, dentro: melhor.folga <= 0 } : null;
   regiaoCache.set(l.id, info);
   return info;
 }
@@ -964,6 +1006,7 @@ function setConnStatus(ok) {
 
 function renderAll() {
   regiaoCache.clear();
+  municipiosCache.clear();
   renderRegiaoBar();
   renderUpdateLine();
   renderFilters();
@@ -1050,7 +1093,7 @@ function renderDashboard() {
       <div><div style="font-weight:600;font-size:.76rem;">${fmtDateTime(l.dataSessao).slice(0, 10)}</div>${prazoBadge(l)}</div>
       <div>
         <div class="obj clamp" style="-webkit-line-clamp:2;">${escapeHtml(l.objeto)}</div>
-        <div class="org">${escapeHtml(l.cidade)} · ${escapeHtml(l.orgao)} · ${fmtMoney(l.valor) || "valor n/i"}</div>
+        <div class="org">${escapeHtml(cidadeExibicao(l))} · ${escapeHtml(l.orgao)} · ${fmtMoney(l.valor) || "valor n/i"}</div>
       </div>
       ${interesseBotoes(l)}
     </div>`).join("") + (pend.length > 10 ? `<div style="padding-top:10px;"><button class="btn btn-ghost btn-sm" data-go="pendentes">Ver todas as ${pend.length} pendentes →</button></div>` : "")
@@ -1062,7 +1105,7 @@ function renderDashboard() {
   document.getElementById("dash-proximas").innerHTML = prox.length ? `<table><tbody>${prox.map(l => `
     <tr data-edit="${escapeHtml(l.id)}" style="cursor:pointer;">
       <td class="nowrap"><b>${fmtDateTime(l.dataSessao)}</b><div>${prazoBadge(l)}</div></td>
-      <td><div class="clamp" style="-webkit-line-clamp:2;">${escapeHtml(l.objeto)}</div><div class="muted small">${escapeHtml(l.cidade)} · ${escapeHtml(l.orgao)}</div></td>
+      <td><div class="clamp" style="-webkit-line-clamp:2;">${escapeHtml(l.objeto)}</div><div class="muted small">${escapeHtml(cidadeExibicao(l))} · ${escapeHtml(l.orgao)}</div></td>
       <td class="nowrap">${fmtMoney(l.valor)}</td>
     </tr>`).join("")}</tbody></table>`
     : `<div class="empty-state" style="padding:20px;">Marque SIM nas licitações em que vamos participar para elas aparecerem aqui.</div>`;
@@ -1074,7 +1117,7 @@ function renderDashboard() {
   barras("dash-servico", contar(abertas, l => automatica(l) ? servicosDetectados(l) : (l.servicos || []).map(s => s.nome)).slice(0, 8));
   barras("dash-modalidade", contar(abertas, l => l.modalidade || "Não informada").slice(0, 8));
   const porCidade = new Map();
-  for (const l of abertas) porCidade.set(l.cidade || "—", (porCidade.get(l.cidade || "—") || 0) + (Number(l.valor) || 0));
+  for (const l of abertas) { const c = cidadeExibicao(l) || "—"; porCidade.set(c, (porCidade.get(c) || 0) + (Number(l.valor) || 0)); }
   barras("dash-cidades", [...porCidade.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10), fmtMoneyCurto);
 }
 
@@ -1176,7 +1219,7 @@ function abrirAtestados(id) {
   if (!l) return;
   const linhas = linhasAtestado(l);
   const ip = indicePrincipal(linhas);
-  document.getElementById("atest-sub").textContent = `${l.cidade || ""} · ${l.orgao || ""} · ${l.numero || ""}`;
+  document.getElementById("atest-sub").textContent = `${cidadeExibicao(l)} · ${l.orgao || ""} · ${l.numero || ""}`;
   document.getElementById("atest-lista").innerHTML = linhas.map((s, i) => `
     <li class="${i === ip ? "principal" : ""}">${i === ip ? `<span class="badge accent">PRINCIPAL</span> ` : ""}${escapeHtml(s)}</li>`).join("");
   document.getElementById("atest-nota").textContent = l.preenchidoAuto ? "Extraído do edital automaticamente — confira no edital antes de decidir." : "";
@@ -1214,7 +1257,7 @@ async function abrirDocumentos(id) {
   const l = licitacoes.find(x => x.id === id);
   if (!l) return;
   docsId = id;
-  document.getElementById("docs-sub").textContent = `${l.cidade || ""} · ${l.orgao || ""} · ${l.numero || ""}`;
+  document.getElementById("docs-sub").textContent = `${cidadeExibicao(l)} · ${l.orgao || ""} · ${l.numero || ""}`;
   const principais = document.getElementById("docs-principais");
   const outros = document.getElementById("docs-outros");
   const outrosTitulo = document.getElementById("docs-outros-titulo");
@@ -1326,7 +1369,7 @@ function renderTabela() {
       <td>${interesseBotoes(l)}</td>
       <td class="nowrap"><b>${fmtDateTime(l.dataSessao) || "—"}</b><div class="badges">${prazoBadge(l)}${novo ? `<span class="badge nova">NOVA</span>` : ""}</div></td>
       <td>${escapeHtml(l.orgao)}${p.esfera ? `<div class="muted small">${escapeHtml(p.esfera)}</div>` : l.origem === "ALERTA" ? `<div class="muted small">via Alerta Licitação</div>` : !automatica(l) ? `<div class="muted small">privada / manual</div>` : ""}</td>
-      <td>${escapeHtml(l.cidade)}${regiaoHtml(l)}</td>
+      <td>${escapeHtml(cidadeExibicao(l))}${ehSedeDoOrgao(l) && municipiosDe(l).length ? `<div class="muted small" title="${escapeHtml(l.cidade)}">local da obra pelo objeto · órgão em ${escapeHtml((l.cidade || "").replace(/\s*\(.*$/, ""))}</div>` : ""}${regiaoHtml(l)}</td>
       <td>${escapeHtml(l.numero)}${l.modalidade ? `<div class="muted small">${escapeHtml(l.modalidade)}</div>` : ""}</td>
       <td class="col-serv">${servicosHtml(l)}</td>
       <td class="nowrap">${fmtMoney(l.valor) || `<span class="muted">${l.origem === "ALERTA" ? "não informado (ver edital)" : "sigiloso / n/i"}</span>`}</td>
@@ -1817,7 +1860,7 @@ function exportarExcel() {
     "INTERESSE": l.interesse === "SIM" ? "SIM" : l.interesse === "NAO" ? "NÃO" : "A DECIDIR",
     "DATA": fmtDateTime(l.dataSessao),
     "ÓRGÃO": l.orgao || "",
-    "CIDADE": l.cidade || "",
+    "CIDADE": cidadeExibicao(l),
     "DISTÂNCIA DA BASE (linha reta)": textoRegiao(l),
     "Nº LICITAÇÃO": l.numero || "",
     "MODALIDADE": l.modalidade || "",
