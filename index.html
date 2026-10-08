@@ -257,6 +257,7 @@
       <button class="btn btn-ghost btn-sm" id="btn-print">Imprimir / PDF</button>
       <button class="btn btn-ghost" id="btn-add">+ Nova licitação</button>
       <button class="btn btn-accent" id="btn-pncp">⟳ Atualizar do PNCP</button>
+      <button class="btn btn-accent" id="btn-alerta" title="Busca no Alerta Licitação (pede a chave da API na primeira vez)">⟳ Atualizar do Alerta</button>
     </div>
   </header>
 
@@ -458,13 +459,13 @@
 <div class="modal-backdrop" id="modal-pncp">
   <div class="modal" style="max-width:560px;">
     <div class="modal-head">
-      <h2>Atualizando do PNCP</h2>
+      <h2 id="pncp-titulo">Atualizando do PNCP</h2>
     </div>
     <div class="modal-body">
       <div id="pncp-etapa" style="font-size:.85rem;font-weight:600;">Preparando...</div>
       <div class="progress"><i id="pncp-bar"></i></div>
       <div class="log" id="pncp-log"></div>
-      <p class="muted small" style="margin-top:10px;">Buscamos as licitações de MG com propostas abertas (concorrências, pregões e dispensas) e filtramos pavimentação asfáltica (drenagem e terraplenagem só quando vêm junto com pavimentação). Calçamento e serviços de gerenciamento/supervisão/projeto ficam de fora. O PNCP limita consultas seguidas, então há pausas: leva de 3 a 6 minutos.</p>
+      <p class="muted small" style="margin-top:10px;" id="pncp-nota">Buscamos as licitações de MG com propostas abertas (concorrências, pregões e dispensas) e filtramos pavimentação asfáltica (drenagem e terraplenagem só quando vêm junto com pavimentação). Calçamento e serviços de gerenciamento/supervisão/projeto ficam de fora. O PNCP limita consultas seguidas, então há pausas: leva de 3 a 6 minutos.</p>
     </div>
     <div class="modal-foot">
       <span class="muted small" id="pncp-resumo"></span>
@@ -572,16 +573,16 @@ const store = {
     if (useFirebase) return withTimeout(() => fs.deleteDoc(fs.doc(db, COL_NAME, id)));
     lsWrite(lsRead().filter(i => i.id !== id));
   },
-  async getMeta() {
+  async getMeta(nome = "pncp") {
     if (useFirebase) {
-      const s = await withTimeout(() => fs.getDoc(fs.doc(db, META_COL, "pncp")));
+      const s = await withTimeout(() => fs.getDoc(fs.doc(db, META_COL, nome)));
       return s.exists() ? s.data() : null;
     }
-    try { return JSON.parse(localStorage.getItem(LS_META)); } catch { return null; }
+    try { return JSON.parse(localStorage.getItem(LS_META + (nome === "pncp" ? "" : "_" + nome))); } catch { return null; }
   },
-  async setMeta(m) {
-    if (useFirebase) return withTimeout(() => fs.setDoc(fs.doc(db, META_COL, "pncp"), m));
-    localStorage.setItem(LS_META, JSON.stringify(m));
+  async setMeta(m, nome = "pncp") {
+    if (useFirebase) return withTimeout(() => fs.setDoc(fs.doc(db, META_COL, nome), m));
+    localStorage.setItem(LS_META + (nome === "pncp" ? "" : "_" + nome), JSON.stringify(m));
   }
 };
 
@@ -679,8 +680,12 @@ function servicosIniciais(c) {
   // com um serviço só, o objeto inteiro é dele; misto precisa da planilha orçamentária
   return lista.length === 1 ? [{ nome: lista[0], pct: 100 }] : [];
 }
+// dados de origem automática (PNCP ou Alerta Licitação); licitações manuais não têm
+function fonte(l) { return l.pncp || l.alerta || {}; }
+function automatica(l) { return l.origem === "PNCP" || l.origem === "ALERTA"; }
+
 function servicosDetectados(l) {
-  const p = l.pncp || {};
+  const p = fonte(l);
   const out = [];
   if (p.pav) out.push("Pavimentação");
   if (p.ter) out.push("Terraplenagem");
@@ -689,8 +694,9 @@ function servicosDetectados(l) {
 }
 
 function isAtiva(l) {
-  if (l.origem !== "PNCP") return !STATUS_FINAIS.includes(l.status);
-  if (l.naListaPncp === false) return false;
+  if (!automatica(l)) return !STATUS_FINAIS.includes(l.status);
+  if (l.origem === "PNCP" && l.naListaPncp === false) return false;
+  if (l.origem === "ALERTA" && l.naListaAlerta === false) return false;
   return !l.dataSessao || l.dataSessao >= localIso(new Date());
 }
 function isPendente(l) { return !l.interesse && isAtiva(l); }
@@ -699,6 +705,7 @@ function isSim(l) { return l.interesse === "SIM"; }
 /* ------------------------------ estado ------------------------------ */
 let licitacoes = [];
 let meta = null;
+let metaAlerta = null;
 let editingId = null;
 let modalInteresse = "";
 let sortKey = "dataSessao";
@@ -706,7 +713,7 @@ let sortDir = "asc";
 
 async function init() {
   try {
-    [licitacoes, meta] = await Promise.all([store.loadAll(), store.getMeta()]);
+    [licitacoes, meta, metaAlerta] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta")]);
     setConnStatus(true);
   } catch (e) {
     console.error(e);
@@ -742,6 +749,7 @@ function renderUpdateLine() {
   const dias = Math.floor((Date.now() - quando) / 86400000);
   el.className = "update-line" + (dias >= 7 ? " old" : "");
   el.textContent = `Última atualização do PNCP: ${quando.toLocaleString("pt-BR")} — ${meta.relevantes} relevantes de ${meta.totalColetadas} licitações abertas em MG, ${meta.novos} novas.`
+    + (metaAlerta && metaAlerta.em ? ` Alerta Licitação: ${new Date(metaAlerta.em).toLocaleString("pt-BR")} — ${metaAlerta.relevantes} relevantes, ${metaAlerta.novos} novas (${metaAlerta.duplicadas} já vinham do PNCP).` : "")
     + (dias >= 7 ? " Faz mais de uma semana: vale atualizar." : "");
 }
 
@@ -828,7 +836,7 @@ function renderDashboard() {
   const contar = (lista, fn) => { const m = new Map(); for (const l of lista) for (const k of [].concat(fn(l))) if (k) m.set(k, (m.get(k) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
   barras("dash-status", contar(sim, l => l.status || "SEM STATUS"));
   const abertas = licitacoes.filter(l => isPendente(l) || (isSim(l) && isAtiva(l)));
-  barras("dash-servico", contar(abertas, l => l.origem === "PNCP" ? servicosDetectados(l) : (l.servicos || []).map(s => s.nome)).slice(0, 8));
+  barras("dash-servico", contar(abertas, l => automatica(l) ? servicosDetectados(l) : (l.servicos || []).map(s => s.nome)).slice(0, 8));
   barras("dash-modalidade", contar(abertas, l => l.modalidade || "Não informada").slice(0, 8));
   const porCidade = new Map();
   for (const l of abertas) porCidade.set(l.cidade || "—", (porCidade.get(l.cidade || "—") || 0) + (Number(l.valor) || 0));
@@ -857,17 +865,17 @@ function getFiltered() {
   const fPrazo = Number(document.getElementById("f-prazo").value) || 0;
 
   const list = licitacoes.filter(l => {
-    if (fInt === "ativos" && !(isPendente(l) || isSim(l) || (l.origem !== "PNCP" && l.interesse !== "NAO"))) return false;
+    if (fInt === "ativos" && !(isPendente(l) || isSim(l) || (!automatica(l) && l.interesse !== "NAO"))) return false;
     if (fInt === "pendentes" && !isPendente(l)) return false;
     if (fInt === "sim" && !isSim(l)) return false;
     if (fInt === "nao" && l.interesse !== "NAO") return false;
     if (fServ) {
-      const p = l.pncp || {};
+      const p = fonte(l);
       const nomes = norm((l.servicos || []).map(s => s.nome).join(" "));
       const ok = { pav: p.pav || /paviment|asfalt|cbuq|recape/.test(nomes), ter: p.ter || /terrapl/.test(nomes), dre: p.dre || /drenag/.test(nomes) }[fServ];
       if (!ok) return false;
     }
-    if (fTipo && (l.pncp?.tipo || "Obra") !== fTipo) return false;
+    if (fTipo && (fonte(l).tipo || "Obra") !== fTipo) return false;
     if (fMod && l.modalidade !== fMod) return false;
     if (fStatus && l.status !== fStatus) return false;
     if (fPrazo) { const d = diasAte(l.dataSessao); if (d === null || d < 0 || d > fPrazo) return false; }
@@ -905,7 +913,7 @@ function servicosHtml(l) {
 }
 
 function objetoBadges(l) {
-  const p = l.pncp || {};
+  const p = fonte(l);
   const b = [];
   if (p.tipo && p.tipo !== "Obra") b.push(`<span class="badge info">${escapeHtml(p.tipo)}</span>`);
   // o tipo confirmado no edital vale mais que a leitura do objeto
@@ -927,19 +935,20 @@ function renderTabela() {
     return;
   }
   tbody.innerHTML = list.map(l => {
-    const p = l.pncp || {};
-    const novo = meta && l.lote === meta.em && !l.interesse;
+    const p = fonte(l);
+    const novo = !l.interesse && ((meta && l.lote === meta.em) || (metaAlerta && l.lote === metaAlerta.em));
     const linkPortal = safeUrl(l.linkPortal);
     const linkPncp = safeUrl(p.linkPncp);
+    const linkAlerta = safeUrl(l.alerta?.link);
     return `
     <tr class="${l.interesse === "NAO" ? "row-nao" : l.interesse === "SIM" ? "row-sim" : ""}">
       <td>${interesseBotoes(l)}</td>
       <td class="nowrap"><b>${fmtDateTime(l.dataSessao) || "—"}</b><div class="badges">${prazoBadge(l)}${novo ? `<span class="badge nova">NOVA</span>` : ""}</div></td>
-      <td>${escapeHtml(l.orgao)}${p.esfera ? `<div class="muted small">${escapeHtml(p.esfera)}</div>` : l.origem !== "PNCP" ? `<div class="muted small">privada / manual</div>` : ""}</td>
+      <td>${escapeHtml(l.orgao)}${p.esfera ? `<div class="muted small">${escapeHtml(p.esfera)}</div>` : l.origem === "ALERTA" ? `<div class="muted small">via Alerta Licitação</div>` : !automatica(l) ? `<div class="muted small">privada / manual</div>` : ""}</td>
       <td>${escapeHtml(l.cidade)}</td>
       <td>${escapeHtml(l.numero)}${l.modalidade ? `<div class="muted small">${escapeHtml(l.modalidade)}</div>` : ""}</td>
       <td class="col-serv">${servicosHtml(l)}</td>
-      <td class="nowrap">${fmtMoney(l.valor) || `<span class="muted">sigiloso / n/i</span>`}</td>
+      <td class="nowrap">${fmtMoney(l.valor) || `<span class="muted">${l.origem === "ALERTA" ? "não informado (ver edital)" : "sigiloso / n/i"}</span>`}</td>
       <td class="col-objeto"><div class="clamp">${escapeHtml(l.objeto)}</div>${(l.objeto || "").length > 260 ? `<span class="more" data-more>ver tudo</span>` : ""}
         ${objetoBadges(l)}</td>
       <td class="col-atest">${escapeHtml(l.atestados) || `<span class="muted">—</span>`}</td>
@@ -950,6 +959,7 @@ function renderTabela() {
       <td class="no-print"><div class="row-actions">
         <button class="icon-btn" data-edit="${escapeHtml(l.id)}" title="Editar / preencher">Editar</button>
         ${linkPncp ? `<a class="icon-btn" href="${escapeHtml(linkPncp)}" target="_blank" rel="noopener" title="Abrir no PNCP (edital e anexos)">PNCP</a>` : ""}
+        ${linkAlerta ? `<a class="icon-btn" href="${escapeHtml(linkAlerta)}" target="_blank" rel="noopener" title="Abrir no Alerta Licitação">Alerta</a>` : ""}
         ${linkPortal ? `<a class="icon-btn" href="${escapeHtml(linkPortal)}" target="_blank" rel="noopener" title="Abrir portal de origem">Portal</a>` : ""}
       </div></td>
     </tr>`;
@@ -1025,8 +1035,14 @@ function abrirModal(id) {
       Prazo de propostas: ${fmtDateTime(p.dataEncerramento) || "n/i"} · Serviços detectados: ${det.join(", ") || "—"} · Tipo: ${escapeHtml(p.tipo)}
       ${p.publicadoVezes > 1 ? `<br>Publicado ${p.publicadoVezes}x no PNCP com o mesmo objeto.` : ""}
       <br><a href="${escapeHtml(safeUrl(p.linkPncp))}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;">Abrir no PNCP (edital e anexos) →</a>`;
+  } else if (l.alerta) {
+    const a = l.alerta;
+    box.style.display = "block";
+    box.innerHTML = `<b>Dados do Alerta Licitação</b> — ${escapeHtml(a.modalidade)} · encontrada em ${escapeHtml(a.dataInsercao || "")}<br>
+      Abertura: ${fmtDateTime(a.abertura) || "n/i"} · Serviços detectados: ${servicosDetectados(l).join(", ") || "—"} · Tipo: ${escapeHtml(a.tipo)}
+      <br><a href="${escapeHtml(safeUrl(a.link))}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;">Abrir no Alerta Licitação →</a>`;
   } else box.style.display = "none";
-  document.getElementById("m-excluir").style.visibility = id && l.origem !== "PNCP" ? "visible" : "hidden";
+  document.getElementById("m-excluir").style.visibility = id && !automatica(l) ? "visible" : "hidden";
   modalLic.classList.add("open");
 }
 
@@ -1061,7 +1077,7 @@ async function salvarModal() {
     if (editingId) {
       const atual = licitacoes.find(x => x.id === editingId);
       // campos do PNCP alterados à mão não são mais sobrescritos nas próximas atualizações
-      if (atual.origem === "PNCP") {
+      if (automatica(atual)) {
         const editados = new Set(atual.camposEditados || []);
         for (const k of CAMPOS_PNCP) if (String(dados[k] ?? "") !== String(atual[k] ?? "")) editados.add(k);
         dados.camposEditados = [...editados];
@@ -1157,6 +1173,8 @@ async function atualizarPncp() {
   const fechar = document.getElementById("pncp-fechar");
   const resumo = document.getElementById("pncp-resumo");
   logEl.textContent = ""; resumo.textContent = ""; bar.style.width = "0"; fechar.disabled = true;
+  document.getElementById("pncp-titulo").textContent = "Atualizando do PNCP";
+  document.getElementById("pncp-nota").textContent = NOTA_PNCP;
   modal.classList.add("open");
   const log = msg => { logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; };
 
@@ -1253,6 +1271,162 @@ async function atualizarPncp() {
   }
 }
 
+/* ------------------------------ atualização a partir do Alerta Licitação ------------------------------ */
+const NOTA_PNCP = document.getElementById("pncp-nota").textContent;
+const ALERTA_TOKEN_KEY = "alertaLicitacaoToken";
+const ALERTA_PALAVRAS = "pavimentação,pavimentacao,asfalto,asfáltica,asfaltica,CBUQ,concreto betuminoso,recapeamento,tapa-buraco,tapa buraco,microrrevestimento,micro revestimento,fresagem";
+
+// a chave da API nunca vai para o código nem para o banco: fica só no navegador de quem atualiza
+function obterTokenAlerta() {
+  let t = localStorage.getItem(ALERTA_TOKEN_KEY) || "";
+  if (!t) {
+    t = (prompt("Cole a chave (token) da API do Alerta Licitação.\nEla fica guardada só neste navegador.") || "").trim();
+    if (!t) return "";
+    if (!/^[A-Za-z0-9]{16,64}$/.test(t)) { toast("Chave inválida.", true); return ""; }
+    localStorage.setItem(ALERTA_TOKEN_KEY, t);
+  }
+  return t;
+}
+
+async function buscarPaginaAlerta(token, pag, log) {
+  const params = new URLSearchParams({ uf: "MG", palavra_chave: ALERTA_PALAVRAS, pagina: String(pag), licitacoesPorPagina: "100", token });
+  const url = "https://alertalicitacao.com.br/api/v1/licitacoesAbertas/?" + params.toString();
+  for (let t = 1; t <= 3; t++) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 40000);
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return await r.json();
+    } catch (e) {
+      log(`  falha (tentativa ${t}): ${e.name === "AbortError" ? "tempo esgotado" : e.message} — aguardando ${20 * t}s`);
+      await sleep(20000 * t);
+    }
+  }
+  return null;
+}
+
+function palavras(s) { return new Set(norm(s).replace(/^\s*\[[^\]]*\]\s*-?\s*/, "").split(/[^a-z0-9]+/).filter(w => w.length > 3)); }
+function similaridade(a, b) {
+  if (!a.size || !b.size) return 0;
+  let comum = 0;
+  for (const w of a) if (b.has(w)) comum++;
+  return comum / (a.size + b.size - comum);
+}
+function municipioChave(s) { return norm(s).replace(/\(.*?\)/g, "").replace(/[^a-z]/g, ""); }
+
+async function atualizarAlerta() {
+  if (!requireUnlock()) return;
+  const token = obterTokenAlerta();
+  if (!token) return;
+  const modal = document.getElementById("modal-pncp");
+  const etapa = document.getElementById("pncp-etapa");
+  const bar = document.getElementById("pncp-bar");
+  const logEl = document.getElementById("pncp-log");
+  const fechar = document.getElementById("pncp-fechar");
+  const resumo = document.getElementById("pncp-resumo");
+  logEl.textContent = ""; resumo.textContent = ""; bar.style.width = "0"; fechar.disabled = true;
+  document.getElementById("pncp-titulo").textContent = "Atualizando do Alerta Licitação";
+  document.getElementById("pncp-nota").textContent = "Buscamos no Alerta Licitação as licitações abertas em MG com palavras de pavimentação asfáltica e aplicamos o mesmo filtro do PNCP. As que já vieram do PNCP (mesmo município e mesmo objeto) não são duplicadas. O Alerta não informa o valor estimado.";
+  modal.classList.add("open");
+  const log = msg => { logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; };
+
+  try {
+    const coletadas = new Map();
+    const falhas = [];
+    let pag = 1, paginas = 1;
+    while (pag <= paginas) {
+      etapa.textContent = `Página ${pag} de ${paginas}`;
+      bar.style.width = `${Math.round((pag - 1) / Math.max(paginas, 1) * 100)}%`;
+      const j = await buscarPaginaAlerta(token, pag, log);
+      if (j === null) { falhas.push(`p.${pag}`); pag++; continue; }
+      if (Number(j.totalErros) > 0) {
+        const msg = (j.erros || []).map(e => `${e.codigo}: ${e.descricao}`).join("; ");
+        // erro de token: esquece a chave para pedir de novo na próxima vez
+        if ((j.erros || []).some(e => /^T/.test(e.codigo || ""))) localStorage.removeItem(ALERTA_TOKEN_KEY);
+        throw new Error(msg || "Erro na API do Alerta Licitação.");
+      }
+      paginas = Number(j.paginas) || 1;
+      for (const it of j.licitacoes || []) if (it.id_licitacao) coletadas.set(it.id_licitacao, it);
+      log(`Página ${pag}/${paginas} ok (${coletadas.size} licitações lidas)`);
+      pag++;
+      await sleep(1200);
+    }
+    bar.style.width = "100%";
+    etapa.textContent = "Filtrando e gravando...";
+
+    const hoje = localIso(new Date()).slice(0, 10);
+    const existentes = new Map(licitacoes.map(l => [l.id, l]));
+    // licitações do PNCP e manuais, para não trazer a mesma de novo
+    const outras = licitacoes.filter(l => l.origem !== "ALERTA").map(l => ({ mun: municipioChave(l.cidade), dia: (l.dataSessao || "").slice(0, 10), pal: palavras(l.objeto) }));
+    const lote = new Date().toISOString();
+    const entries = [];
+    const vistos = new Set();
+    const vistasNoAlerta = [];
+    let novos = 0, duplicadas = 0, relevantes = 0;
+
+    for (const it of coletadas.values()) {
+      const c = classificar(it.objeto);
+      if (!c) continue;
+      const abertura = (it.abertura_datetime || "").replace(" ", "T");
+      if (abertura && abertura.slice(0, 10) < hoje) continue;
+      const mun = municipioChave(it.municipio), pal = palavras(it.objeto), dia = abertura.slice(0, 10);
+      const igual = o => o.mun === mun && (similaridade(o.pal, pal) >= 0.8 || (o.dia === dia && similaridade(o.pal, pal) >= 0.5));
+      if (outras.some(igual)) { duplicadas++; continue; }
+      if (vistasNoAlerta.some(igual)) continue;
+      vistasNoAlerta.push({ mun, dia, pal });
+      relevantes++;
+
+      const id = "alerta_" + String(it.id_licitacao).replace(/[^\w-]/g, "_");
+      vistos.add(id);
+      const alerta = {
+        id: String(it.id_licitacao), titulo: it.titulo || "", municipio: it.municipio || "", uf: it.uf || "",
+        orgao: it.orgao || "", objeto: (it.objeto || "").trim(), abertura, link: safeUrl(it.link) || "",
+        linkExterno: safeUrl(it.linkExterno) || "", modalidade: it.tipo || "", idTipo: String(it.id_tipo || ""),
+        tipo: c.tipo, pav: c.pav, ter: c.ter, dre: c.dre, asfalto: c.asfalto
+      };
+      const campos = {
+        dataSessao: abertura, orgao: alerta.orgao, cidade: alerta.municipio, numero: alerta.titulo,
+        modalidade: alerta.modalidade, objeto: alerta.objeto, linkPortal: alerta.linkExterno
+      };
+      const atual = existentes.get(id);
+      if (!atual) {
+        novos++;
+        entries.push({ id, data: {
+          origem: "ALERTA", ...campos, valor: null, alerta, naListaAlerta: true, interesse: null, status: "",
+          servicos: servicosIniciais(c), atestados: "", observacao: "", garantiaProposta: "", vencedora: "",
+          camposEditados: [], lote, criadoEm: lote, atualizadoEm: lote
+        }});
+      } else {
+        const upd = { alerta, naListaAlerta: true, atualizadoEm: lote };
+        for (const k of Object.keys(campos)) if (!(atual.camposEditados || []).includes(k)) upd[k] = campos[k];
+        entries.push({ id, data: upd });
+      }
+    }
+    for (const l of licitacoes) {
+      if (l.origem === "ALERTA" && l.naListaAlerta !== false && !vistos.has(l.id)) entries.push({ id: l.id, data: { naListaAlerta: false, atualizadoEm: lote } });
+    }
+    log(`\nGravando ${entries.length} registros...`);
+    await store.saveMany(entries);
+    metaAlerta = { em: lote, totalColetadas: coletadas.size, relevantes, novos, duplicadas, falhas };
+    await store.setMeta(metaAlerta, "alerta");
+    licitacoes = await store.loadAll();
+    renderAll();
+    etapa.textContent = "Concluído.";
+    resumo.textContent = `${relevantes} relevantes · ${novos} novas · ${duplicadas} já vinham do PNCP`;
+    log(`\nPronto: ${coletadas.size} licitações lidas no Alerta, ${relevantes} de pavimentação asfáltica que não estavam no PNCP, ${novos} novas; ${duplicadas} já estavam no portal pelo PNCP.`);
+    if (falhas.length) log(`Atenção: páginas não lidas: ${falhas.join(", ")}. Atualize de novo mais tarde.`);
+  } catch (e) {
+    console.error(e);
+    etapa.textContent = "Erro na atualização.";
+    log("\nERRO: " + (e.message || e));
+    toast(e.message || "Erro ao atualizar do Alerta Licitação.", true);
+  } finally {
+    fechar.disabled = false;
+  }
+}
+
 /* ------------------------------ exportar ------------------------------ */
 function exportarExcel() {
   if (typeof XLSX === "undefined") { toast("Biblioteca do Excel não carregou. Verifique a internet.", true); return; }
@@ -1274,10 +1448,11 @@ function exportarExcel() {
     "GARANTIA DE PROPOSTA": l.garantiaProposta || "",
     "VENCEDORA E DESCONTO FINAL": l.vencedora || "",
     "LINK PNCP": l.pncp?.linkPncp || "",
+    "LINK ALERTA": l.alerta?.link || "",
     "LINK PORTAL": l.linkPortal || ""
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws["!cols"] = [10, 16, 28, 20, 22, 20, 30, 28, 16, 60, 40, 22, 35, 22, 22, 40, 40].map(w => ({ wch: w }));
+  ws["!cols"] = [10, 16, 28, 20, 22, 20, 30, 28, 16, 60, 40, 22, 35, 22, 22, 40, 40, 40].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "CONTROLE DE LICITAÇÕES");
   const d = new Date();
@@ -1335,6 +1510,7 @@ document.getElementById("m-salvar").addEventListener("click", salvarModal);
 document.getElementById("m-excluir").addEventListener("click", excluirAtual);
 document.getElementById("btn-add").addEventListener("click", () => abrirModal(null));
 document.getElementById("btn-pncp").addEventListener("click", atualizarPncp);
+document.getElementById("btn-alerta").addEventListener("click", atualizarAlerta);
 document.getElementById("pncp-fechar").addEventListener("click", () => document.getElementById("modal-pncp").classList.remove("open"));
 document.getElementById("btn-export").addEventListener("click", exportarExcel);
 document.getElementById("btn-print").addEventListener("click", () => { mostrarView("controle"); setTimeout(() => window.print(), 100); });
