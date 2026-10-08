@@ -136,6 +136,14 @@
 
   .col-objeto{min-width:300px;max-width:420px;}
   .col-serv{min-width:200px;}
+  .dist{display:inline-block;margin-top:4px;font-size:.66rem;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;}
+  .dist.dentro{background:rgba(77,124,15,.12);color:var(--lime);}
+  .dist.fora{background:#E2E8F0;color:var(--text-dim);}
+  .dist.indef{background:rgba(180,83,9,.1);color:var(--warning);}
+  .reg-row{display:grid;grid-template-columns:1fr 120px 32px;gap:8px;margin-bottom:8px;align-items:center;}
+  .reg-row input{background:var(--bg);border:1px solid var(--border);padding:9px 11px;border-radius:8px;font-family:inherit;font-size:.82rem;width:100%;}
+  .reg-row button{height:34px;border:1px solid var(--border);background:transparent;border-radius:6px;cursor:pointer;color:var(--text-dim);}
+  .reg-row button:hover{border-color:var(--danger);color:var(--danger);}
   .col-atest{min-width:210px;max-width:280px;}
   .atest-btn{
     display:block;width:100%;text-align:left;background:var(--accent-dim);border:1px solid transparent;border-radius:8px;
@@ -264,6 +272,7 @@
         <span class="status-dot"></span>
         <span id="conn-text">Modo local (este navegador)</span>
       </div>
+      <button class="btn btn-ghost btn-sm" id="btn-regioes" title="Cidades-base e raio de interesse da LM">Regiões de interesse</button>
       <button class="btn btn-ghost btn-sm" id="btn-export">Exportar Excel</button>
       <button class="btn btn-ghost btn-sm" id="btn-print">Imprimir / PDF</button>
       <button class="btn btn-ghost" id="btn-add">+ Nova licitação</button>
@@ -326,6 +335,11 @@
             <option value="sim">Só interesse SIM</option>
             <option value="nao">Só interesse NÃO</option>
             <option value="todos">Todas</option>
+          </select>
+          <select id="f-regiao" title="Distância em linha reta até as cidades-base da LM">
+            <option value="dentro">Só regiões de interesse</option>
+            <option value="fora">Fora das regiões</option>
+            <option value="">Todas as regiões</option>
           </select>
           <select id="f-servico">
             <option value="">Todos os serviços</option>
@@ -482,6 +496,29 @@
     </div>
   </div>
 </div>
+
+<!-- MODAL: regiões de interesse -->
+<div class="modal-backdrop" id="modal-regioes">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-head">
+      <h2>Regiões de interesse da LM</h2>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <p class="muted small" style="margin-bottom:14px;">Uma licitação está "na região" quando o município fica dentro do raio de pelo menos uma cidade-base. A distância é em <b>linha reta</b> entre os municípios (a rodoviária costuma ser 20–30% maior). Órgãos estaduais/consórcios sem município definido aparecem sempre, marcados como "local a conferir".</p>
+      <div id="reg-linhas"></div>
+      <button class="btn btn-ghost btn-sm" id="reg-add" type="button" style="width:100%;justify-content:center;border-style:dashed;color:var(--accent);">+ Adicionar cidade-base</button>
+    </div>
+    <div class="modal-foot">
+      <span class="muted small">Vale para toda a equipe.</span>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" data-close>Cancelar</button>
+        <button class="btn btn-accent" id="reg-salvar">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+<datalist id="dl-municipios"></datalist>
 
 <!-- MODAL: atestados exigidos -->
 <div class="modal-backdrop" id="modal-atest">
@@ -718,6 +755,112 @@ function isAtiva(l) {
   if (l.origem === "ALERTA" && l.naListaAlerta === false) return false;
   return !l.dataSessao || l.dataSessao >= localIso(new Date());
 }
+/* ------------------------------ regiões de interesse ------------------------------ */
+const REGIOES_PADRAO = [
+  { ibge: "3168606", cidade: "Teófilo Otoni", raio: 100 },
+  { ibge: "3106200", cidade: "Belo Horizonte", raio: 200 }
+];
+let municipios = {};          // ibge -> [nome, lat, lon]
+let municipioPorNome = {};    // nome normalizado -> ibge
+let regioes = REGIOES_PADRAO;
+
+async function carregarMunicipios() {
+  try {
+    municipios = await fetch("municipios-mg.json").then(r => r.json());
+    municipioPorNome = {};
+    for (const [ibge, [nome]] of Object.entries(municipios)) municipioPorNome[norm(nome)] = ibge;
+    document.getElementById("dl-municipios").innerHTML = Object.values(municipios).map(m => `<option value="${escapeHtml(m[0])}">`).join("");
+  } catch (e) { console.error("Falha ao carregar municípios:", e); }
+}
+
+function distanciaKm(a, b) {
+  const R = 6371, rad = Math.PI / 180;
+  const dLat = (b[1] - a[1]) * rad, dLon = (b[2] - a[2]) * rad;
+  const h = Math.sin(dLat / 2) ** 2 + Math.cos(a[1] * rad) * Math.cos(b[1] * rad) * Math.sin(dLon / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// município da licitação: pelo código IBGE quando a fonte informa; senão pelo nome da cidade.
+// Órgãos estaduais/consórcios ficam com "(sede do órgão)" e não têm local de obra definido.
+function municipioDe(l) {
+  const ibge = fonte(l).ibge || l.alerta?.municipioIbge;
+  if (ibge && municipios[ibge]) return municipios[ibge];
+  const cidade = l.cidade || "";
+  if (/sede do/i.test(cidade)) return null;
+  const chave = municipioPorNome[norm(cidade.replace(/\(.*?\)/g, "").replace(/\s*[-/]\s*mg\s*$/i, "").trim())];
+  return chave ? municipios[chave] : null;
+}
+
+const regiaoCache = new Map();
+function regiaoDe(l) {
+  if (regiaoCache.has(l.id)) return regiaoCache.get(l.id);
+  const m = municipioDe(l);
+  let info = null;
+  if (m) {
+    let melhor = null;
+    for (const r of regioes) {
+      const base = municipios[r.ibge];
+      if (!base) continue;
+      const d = distanciaKm(m, base);
+      const folga = d - r.raio;
+      if (!melhor || folga < melhor.folga) melhor = { d, folga, base: r.cidade, raio: r.raio };
+    }
+    if (melhor) info = { km: Math.round(melhor.d), base: melhor.base, dentro: melhor.folga <= 0 };
+  }
+  regiaoCache.set(l.id, info);
+  return info;
+}
+function passaRegiao(l) {
+  const f = document.getElementById("f-regiao").value;
+  if (!f) return true;
+  const r = regiaoDe(l);
+  if (f === "dentro") return !r || r.dentro;   // sem local definido continua aparecendo
+  return !!r && !r.dentro;
+}
+function regiaoHtml(l) {
+  const r = regiaoDe(l);
+  if (!r) return automatica(l) || l.cidade ? `<div class="dist indef" title="Município da obra não identificado — conferir no objeto">local a conferir</div>` : "";
+  return `<div class="dist ${r.dentro ? "dentro" : "fora"}" title="Distância em linha reta">${r.km} km de ${escapeHtml(r.base)}</div>`;
+}
+function textoRegiao(l) {
+  const r = regiaoDe(l);
+  return r ? `${r.km} km de ${r.base}${r.dentro ? "" : " (fora)"}` : "local a conferir";
+}
+
+function regLinhaHtml(r = {}) {
+  return `<div class="reg-row">
+    <input type="text" class="rg-cidade" list="dl-municipios" placeholder="Cidade-base (MG)" value="${escapeHtml(r.cidade || "")}">
+    <input type="number" class="rg-raio" min="1" step="10" placeholder="Raio km" value="${r.raio ?? ""}">
+    <button type="button" class="rg-del" title="Remover">✕</button>
+  </div>`;
+}
+function abrirRegioes() {
+  document.getElementById("reg-linhas").innerHTML = (regioes.length ? regioes : [{}]).map(regLinhaHtml).join("");
+  document.getElementById("modal-regioes").classList.add("open");
+}
+async function salvarRegioes() {
+  const lista = [];
+  for (const row of document.querySelectorAll("#reg-linhas .reg-row")) {
+    const nome = row.querySelector(".rg-cidade").value.trim();
+    const raio = Number(row.querySelector(".rg-raio").value);
+    if (!nome && !raio) continue;
+    const ibge = municipioPorNome[norm(nome)];
+    if (!ibge) { toast(`Cidade não encontrada em MG: "${nome}". Escolha da lista.`, true); return; }
+    if (!(raio > 0)) { toast(`Informe o raio em km para ${nome}.`, true); return; }
+    lista.push({ ibge, cidade: municipios[ibge][0], raio });
+  }
+  if (!lista.length) { toast("Cadastre pelo menos uma cidade-base.", true); return; }
+  if (!requireUnlock()) return;
+  try {
+    await store.setMeta({ lista, atualizadoEm: new Date().toISOString() }, "regioes");
+    regioes = lista;
+    regiaoCache.clear();
+    document.getElementById("modal-regioes").classList.remove("open");
+    renderAll();
+    toast("Regiões de interesse salvas.");
+  } catch (e) { toast(e.message || "Erro ao salvar regiões.", true); }
+}
+
 function isPendente(l) { return !l.interesse && isAtiva(l); }
 function isSim(l) { return l.interesse === "SIM"; }
 
@@ -732,7 +875,9 @@ let sortDir = "asc";
 
 async function init() {
   try {
-    [licitacoes, meta, metaAlerta] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta")]);
+    let metaRegioes;
+    [licitacoes, meta, metaAlerta, metaRegioes] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta"), store.getMeta("regioes"), carregarMunicipios()]);
+    if (metaRegioes && Array.isArray(metaRegioes.lista) && metaRegioes.lista.length) regioes = metaRegioes.lista;
     setConnStatus(true);
   } catch (e) {
     console.error(e);
@@ -751,6 +896,7 @@ function setConnStatus(ok) {
 }
 
 function renderAll() {
+  regiaoCache.clear();
   renderUpdateLine();
   renderFilters();
   renderDashboard();
@@ -804,10 +950,12 @@ function prazoBadge(l) {
 }
 
 function renderDashboard() {
-  const pend = licitacoes.filter(isPendente);
-  const sim = licitacoes.filter(isSim);
+  // o dashboard respeita o filtro de região escolhido na aba de controle
+  const base = licitacoes.filter(passaRegiao);
+  const pend = base.filter(isPendente);
+  const sim = base.filter(isSim);
   const simAndamento = sim.filter(l => !STATUS_FINAIS.includes(l.status));
-  const semana = licitacoes.filter(l => (isPendente(l) || (isSim(l) && !STATUS_FINAIS.includes(l.status))) && (() => { const d = diasAte(l.dataSessao); return d !== null && d >= 0 && d <= 7; })());
+  const semana = base.filter(l => (isPendente(l) || (isSim(l) && !STATUS_FINAIS.includes(l.status))) && (() => { const d = diasAte(l.dataSessao); return d !== null && d >= 0 && d <= 7; })());
   const valorDisputa = simAndamento.reduce((s, l) => s + (Number(l.valor) || 0), 0);
   const ganhas = sim.filter(l => l.status === "GANHAMOS").length;
   const perdidas = sim.filter(l => l.status === "PERDEMOS").length;
@@ -852,7 +1000,7 @@ function renderDashboard() {
     : `<div class="empty-state" style="padding:20px;">Marque SIM nas licitações em que vamos participar para elas aparecerem aqui.</div>`;
 
   const contar = (lista, fn) => { const m = new Map(); for (const l of lista) for (const k of [].concat(fn(l))) if (k) m.set(k, (m.get(k) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
-  const abertas = licitacoes.filter(l => isPendente(l) || (isSim(l) && isAtiva(l)));
+  const abertas = base.filter(l => isPendente(l) || (isSim(l) && isAtiva(l)));
   const nomesPavimento = { asfaltico: "Asfáltico", calcamento: "Calçamento (fora do perfil)", misto: "Asfalto + calçamento", nao_identificado: "Não é obra de pavimentação" };
   barras("dash-pavimento", contar(abertas, l => nomesPavimento[l.tipoPavimentoEdital] || "Edital ainda não conferido"));
   barras("dash-servico", contar(abertas, l => automatica(l) ? servicosDetectados(l) : (l.servicos || []).map(s => s.nome)).slice(0, 8));
@@ -894,6 +1042,7 @@ function getFiltered() {
     }
     if (fTipo && (fonte(l).tipo || "Obra") !== fTipo) return false;
     if (fMod && l.modalidade !== fMod) return false;
+    if (!passaRegiao(l)) return false;
     if (fPrazo) { const d = diasAte(l.dataSessao); if (d === null || d < 0 || d > fPrazo) return false; }
     if (busca) {
       const hay = norm([l.orgao, l.cidade, l.objeto, l.numero, l.observacao, l.atestados, l.status].join(" "));
@@ -1001,7 +1150,7 @@ function renderTabela() {
       <td>${interesseBotoes(l)}</td>
       <td class="nowrap"><b>${fmtDateTime(l.dataSessao) || "—"}</b><div class="badges">${prazoBadge(l)}${novo ? `<span class="badge nova">NOVA</span>` : ""}</div></td>
       <td>${escapeHtml(l.orgao)}${p.esfera ? `<div class="muted small">${escapeHtml(p.esfera)}</div>` : l.origem === "ALERTA" ? `<div class="muted small">via Alerta Licitação</div>` : !automatica(l) ? `<div class="muted small">privada / manual</div>` : ""}</td>
-      <td>${escapeHtml(l.cidade)}</td>
+      <td>${escapeHtml(l.cidade)}${regiaoHtml(l)}</td>
       <td>${escapeHtml(l.numero)}${l.modalidade ? `<div class="muted small">${escapeHtml(l.modalidade)}</div>` : ""}</td>
       <td class="col-serv">${servicosHtml(l)}</td>
       <td class="nowrap">${fmtMoney(l.valor) || `<span class="muted">${l.origem === "ALERTA" ? "não informado (ver edital)" : "sigiloso / n/i"}</span>`}</td>
@@ -1187,7 +1336,8 @@ function montarPncp(it, c, vezes) {
     portalNome: prefixo,
     linkPncp: `https://pncp.gov.br/app/editais/${it.orgaoEntidade?.cnpj}/${it.anoCompra}/${it.sequencialCompra}`,
     tipo: c.tipo, pav: c.pav, ter: c.ter, dre: c.dre, asfalto: c.asfalto,
-    publicadoVezes: vezes
+    publicadoVezes: vezes,
+    ibge: String(it.unidadeOrgao?.codigoIbge || "")
   };
 }
 function camposDoPncp(p) {
@@ -1438,6 +1588,7 @@ async function atualizarAlerta() {
         id: String(it.id_licitacao), titulo: it.titulo || "", municipio: it.municipio || "", uf: it.uf || "",
         orgao: it.orgao || "", objeto: (it.objeto || "").trim(), abertura, link: safeUrl(it.link) || "",
         linkExterno: safeUrl(it.linkExterno) || "", modalidade: it.tipo || "", idTipo: String(it.id_tipo || ""),
+        municipioIbge: String(it.municipio_IBGE || ""),
         tipo: c.tipo, pav: c.pav, ter: c.ter, dre: c.dre, asfalto: c.asfalto
       };
       const campos = {
@@ -1490,6 +1641,7 @@ function exportarExcel() {
     "DATA": fmtDateTime(l.dataSessao),
     "ÓRGÃO": l.orgao || "",
     "CIDADE": l.cidade || "",
+    "DISTÂNCIA DA BASE (linha reta)": textoRegiao(l),
     "Nº LICITAÇÃO": l.numero || "",
     "MODALIDADE": l.modalidade || "",
     "SERVIÇOS": (l.servicos || []).map(s => `${s.nome}${s.pct != null ? " " + s.pct + "%" : ""}`).join("\n") || servicosDetectados(l).join(", "),
@@ -1506,7 +1658,7 @@ function exportarExcel() {
     "LINK PORTAL": l.linkPortal || ""
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws["!cols"] = [10, 16, 28, 20, 22, 20, 30, 28, 16, 60, 40, 22, 35, 22, 22, 40, 40, 40].map(w => ({ wch: w }));
+  ws["!cols"] = [10, 16, 28, 20, 22, 22, 20, 30, 28, 16, 60, 40, 22, 35, 22, 22, 40, 40, 40].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "CONTROLE DE LICITAÇÕES");
   const d = new Date();
@@ -1569,6 +1721,11 @@ document.getElementById("btn-pncp").addEventListener("click", atualizarPncp);
 document.getElementById("btn-alerta").addEventListener("click", atualizarAlerta);
 document.getElementById("pncp-fechar").addEventListener("click", () => document.getElementById("modal-pncp").classList.remove("open"));
 document.getElementById("btn-export").addEventListener("click", exportarExcel);
+document.getElementById("f-regiao").addEventListener("change", () => { renderDashboard(); renderTabela(); });
+document.getElementById("btn-regioes").addEventListener("click", abrirRegioes);
+document.getElementById("reg-add").addEventListener("click", () => document.getElementById("reg-linhas").insertAdjacentHTML("beforeend", regLinhaHtml()));
+document.getElementById("reg-linhas").addEventListener("click", e => { if (e.target.closest(".rg-del")) e.target.closest(".reg-row").remove(); });
+document.getElementById("reg-salvar").addEventListener("click", salvarRegioes);
 document.getElementById("btn-print").addEventListener("click", () => { mostrarView("controle"); setTimeout(() => window.print(), 100); });
 
 init();
