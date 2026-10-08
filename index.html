@@ -348,11 +348,6 @@
             <option value="ter">Terraplenagem</option>
             <option value="dre">Drenagem</option>
           </select>
-          <select id="f-tipo">
-            <option value="">Todos os tipos</option>
-            <option value="Obra">Obra</option>
-            <option value="Fornecimento">Fornecimento de material</option>
-          </select>
           <select id="f-modalidade"><option value="">Todas as modalidades</option></select>
           <select id="f-prazo">
             <option value="">Qualquer prazo</option>
@@ -711,9 +706,15 @@ const RX = {
   // calçamento (bloquete/intertravado) fica de fora, salvo se o edital também tiver asfalto
   calc: /calcamento|bloquete|intertravad|sextavad|paralelep|polied|\bpedra\b|blocos? de concreto/,
   asf: /asfalt|cbuq|betuminoso|recapeamento|micro\s*-?\s*revestimento|microrrevestimento|tratamento superficial|\btsd\b|\btss\b|\bpmf\b|tapa\s*-?\s*buracos?|fresagem/,
-  tec: /\b(consultoria|gerenciamento|supervisao|fiscalizacao)\b|elaboracao de (estudos|projetos?)/,
-  forn: /\b(aquisicao|compra)\b/
+  tec: /\b(consultoria|gerenciamento|supervisao|fiscalizacao)\b|elaboracao de (estudos|projetos?)/
 };
+// compra de material sem execução pela contratada (CBUQ, emulsão, agregados...). Olha só o começo do
+// objeto, que diz o que está sendo contratado; "destinada à execução"/"para aplicação" descrevem o uso do material.
+function ehAquisicaoMaterial(objeto) {
+  const ini = norm(objeto).replace(/^\s*\[[^\]]*\]\s*-?\s*/, "").slice(0, 160)
+    .replace(/destinad[oa]s? (a|para) (a )?(execucao|aplicacao)|para (a )?aplicacao/g, " ");
+  return /\b(aquisicao|compra)\b/.test(ini) && !/execucao|executar|prestacao de servico|e aplicacao|aplicacao de/.test(ini);
+}
 function norm(s) { return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
 function classificar(objeto) {
   const n = norm(objeto).replace(RX.neutro, " ");
@@ -725,9 +726,9 @@ function classificar(objeto) {
   if (RX.calc.test(n) && !asfalto) return null;
   // gerenciamento, supervisão, consultoria e projetos ficam de fora
   if (RX.tec.test(n) && !/integrada/.test(n)) return null;
-  const tipo = RX.forn.test(n) && !/execucao|executar|prestacao de servico/.test(n) ? "Fornecimento" : "Obra";
+  if (ehAquisicaoMaterial(objeto)) return null;
   const chave = n.replace(/^\s*\[[^\]]*\]\s*-?\s*/, "").replace(/[^a-z0-9]/g, "");
-  return { pav, ter, dre, asfalto, tipo, chave };
+  return { pav, ter, dre, asfalto, chave };
 }
 function servicosIniciais(c) {
   const lista = [];
@@ -881,8 +882,13 @@ async function salvarRegioes() {
   } catch (e) { toast(e.message || "Erro ao salvar regiões.", true); }
 }
 
-// a LM não faz calçamento: o que o edital confirmou como calçamento fica guardado, mas não aparece
-function visivel(l) { return l.tipoPavimentoEdital !== "calcamento"; }
+// a LM não faz calçamento nem vende material: o que cair nisso fica guardado no banco, mas não aparece
+function visivel(l) {
+  if (l.tipoPavimentoEdital === "calcamento") return false;
+  // compras de material também não interessam (as cadastradas à mão continuam, ex.: clientes privados)
+  if (automatica(l) && ehAquisicaoMaterial(l.objeto)) return false;
+  return true;
+}
 
 function isPendente(l) { return !l.interesse && isAtiva(l); }
 function isSim(l) { return l.interesse === "SIM"; }
@@ -1049,7 +1055,6 @@ function getFiltered() {
   const busca = norm(document.getElementById("f-busca").value.trim());
   const fInt = document.getElementById("f-interesse").value;
   const fServ = document.getElementById("f-servico").value;
-  const fTipo = document.getElementById("f-tipo").value;
   const fMod = document.getElementById("f-modalidade").value;
   const fPrazo = Number(document.getElementById("f-prazo").value) || 0;
 
@@ -1065,7 +1070,6 @@ function getFiltered() {
       const ok = { pav: p.pav || /paviment|asfalt|cbuq|recape/.test(nomes), ter: p.ter || /terrapl/.test(nomes), dre: p.dre || /drenag/.test(nomes) }[fServ];
       if (!ok) return false;
     }
-    if (fTipo && (fonte(l).tipo || "Obra") !== fTipo) return false;
     if (fMod && l.modalidade !== fMod) return false;
     if (!passaRegiao(l)) return false;
     if (fPrazo) { const d = diasAte(l.dataSessao); if (d === null || d < 0 || d > fPrazo) return false; }
@@ -1145,7 +1149,6 @@ function abrirAtestados(id) {
 function objetoBadges(l) {
   const p = fonte(l);
   const b = [];
-  if (p.tipo && p.tipo !== "Obra") b.push(`<span class="badge info">${escapeHtml(p.tipo)}</span>`);
   // o tipo confirmado no edital vale mais que a leitura do objeto
   if (l.tipoPavimentoEdital === "misto") b.push(`<span class="badge warn">asfalto + calçamento</span>`);
   else if (l.tipoPavimentoEdital !== "asfaltico" && p.asfalto === false) b.push(`<span class="badge warn" title="O objeto não diz se é asfáltica — conferir no edital">tipo de pavimento não informado — conferir</span>`);
@@ -1259,14 +1262,14 @@ function abrirModal(id) {
     const det = servicosDetectados(l);
     box.style.display = "block";
     box.innerHTML = `<b>Dados do PNCP</b> — ${escapeHtml(p.modalidade)} · ${escapeHtml(p.esfera)} · ${escapeHtml(p.situacao)}<br>
-      Prazo de propostas: ${fmtDateTime(p.dataEncerramento) || "n/i"} · Serviços detectados: ${det.join(", ") || "—"} · Tipo: ${escapeHtml(p.tipo)}
+      Prazo de propostas: ${fmtDateTime(p.dataEncerramento) || "n/i"} · Serviços detectados: ${det.join(", ") || "—"}
       ${p.publicadoVezes > 1 ? `<br>Publicado ${p.publicadoVezes}x no PNCP com o mesmo objeto.` : ""}
       <br><a href="${escapeHtml(safeUrl(p.linkPncp))}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;">Abrir no PNCP (edital e anexos) →</a>`;
   } else if (l.alerta) {
     const a = l.alerta;
     box.style.display = "block";
     box.innerHTML = `<b>Dados do Alerta Licitação</b> — ${escapeHtml(a.modalidade)} · encontrada em ${escapeHtml(a.dataInsercao || "")}<br>
-      Abertura: ${fmtDateTime(a.abertura) || "n/i"} · Serviços detectados: ${servicosDetectados(l).join(", ") || "—"} · Tipo: ${escapeHtml(a.tipo)}
+      Abertura: ${fmtDateTime(a.abertura) || "n/i"} · Serviços detectados: ${servicosDetectados(l).join(", ") || "—"}
       <br><a href="${escapeHtml(safeUrl(a.link))}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;">Abrir no Alerta Licitação →</a>`;
   } else box.style.display = "none";
   document.getElementById("m-excluir").style.visibility = id && !automatica(l) ? "visible" : "hidden";
@@ -1359,7 +1362,7 @@ function montarPncp(it, c, vezes) {
     linkOrigem: safeUrl(it.linkSistemaOrigem) || "",
     portalNome: prefixo,
     linkPncp: `https://pncp.gov.br/app/editais/${it.orgaoEntidade?.cnpj}/${it.anoCompra}/${it.sequencialCompra}`,
-    tipo: c.tipo, pav: c.pav, ter: c.ter, dre: c.dre, asfalto: c.asfalto,
+    pav: c.pav, ter: c.ter, dre: c.dre, asfalto: c.asfalto,
     publicadoVezes: vezes,
     ibge: String(it.unidadeOrgao?.codigoIbge || "")
   };
@@ -1613,7 +1616,7 @@ async function atualizarAlerta() {
         orgao: it.orgao || "", objeto: (it.objeto || "").trim(), abertura, link: safeUrl(it.link) || "",
         linkExterno: safeUrl(it.linkExterno) || "", modalidade: it.tipo || "", idTipo: String(it.id_tipo || ""),
         municipioIbge: String(it.municipio_IBGE || ""),
-        tipo: c.tipo, pav: c.pav, ter: c.ter, dre: c.dre, asfalto: c.asfalto
+        pav: c.pav, ter: c.ter, dre: c.dre, asfalto: c.asfalto
       };
       const campos = {
         dataSessao: abertura, orgao: alerta.orgao, cidade: alerta.municipio, numero: alerta.titulo,
@@ -1719,7 +1722,7 @@ document.addEventListener("click", e => {
   if (more) { const c = more.previousElementSibling; c.classList.toggle("open"); more.textContent = c.classList.contains("open") ? "ver menos" : "ver tudo"; return; }
   if (e.target.closest("[data-close]")) e.target.closest(".modal-backdrop").classList.remove("open");
 });
-["f-busca", "f-interesse", "f-servico", "f-tipo", "f-modalidade", "f-prazo"].forEach(id => {
+["f-busca", "f-interesse", "f-servico", "f-modalidade", "f-prazo"].forEach(id => {
   document.getElementById(id).addEventListener(id === "f-busca" ? "input" : "change", renderTabela);
 });
 document.querySelectorAll("th.sortable").forEach(th => th.addEventListener("click", () => {
