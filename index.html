@@ -1,0 +1,1325 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Controle de Licitações — LM</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#F3F6F8;
+    --bg-elev:#FFFFFF;
+    --card:#FFFFFF;
+    --card-hover:#EAF4F8;
+    --border:#DCE4EA;
+    --text:#1F2937;
+    --text-dim:#3F4A59;
+    --text-faint:#64748B;
+    --accent:#0B83B2;
+    --accent-light:#00A3DA;
+    --accent-dim:#DCEEF6;
+    --warning:#B45309;
+    --danger:#DC2626;
+    --info:#2563EB;
+    --lime:#4D7C0F;
+    --radius:10px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{background:var(--bg);color:var(--text);font-family:'Space Grotesk', sans-serif;min-height:100vh;}
+  a{color:inherit;text-decoration:none;}
+  ::-webkit-scrollbar{width:8px;height:8px;}
+  ::-webkit-scrollbar-thumb{background:#C7D2DB;border-radius:4px;}
+  ::-webkit-scrollbar-track{background:transparent;}
+
+  #app{display:flex;flex-direction:column;min-height:100vh;}
+
+  header{
+    display:flex;align-items:center;justify-content:space-between;
+    padding:16px 28px;border-bottom:1px solid var(--border);
+    background:var(--bg-elev);flex-wrap:wrap;gap:12px;position:sticky;top:0;z-index:50;
+  }
+  .brand{display:flex;align-items:center;gap:12px;}
+  .brand .logo{width:40px;height:40px;object-fit:contain;flex-shrink:0;}
+  .brand h1{font-size:1.05rem;font-weight:600;letter-spacing:.2px;color:var(--accent);}
+  .brand span{display:block;font-size:.72rem;color:var(--text-dim);font-weight:500;letter-spacing:.5px;}
+  .header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
+
+  .status-pill{
+    display:flex;align-items:center;gap:6px;font-size:.72rem;color:var(--text-dim);
+    background:var(--card);border:1px solid var(--border);padding:6px 12px;border-radius:999px;
+  }
+  .status-dot{width:7px;height:7px;border-radius:50%;background:var(--warning);}
+  .status-pill.ok .status-dot{background:var(--accent);}
+
+  .btn{
+    border:none;border-radius:8px;padding:10px 16px;font-family:inherit;
+    font-weight:600;font-size:.82rem;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s;
+  }
+  .btn-accent{background:var(--accent);color:#FFFFFF;}
+  .btn-accent:hover{background:#096A92;}
+  .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);}
+  .btn-ghost:hover{background:var(--card-hover);border-color:var(--accent-light);}
+  .btn-danger-ghost{background:transparent;color:var(--danger);border:1px solid var(--border);}
+  .btn-danger-ghost:hover{border-color:var(--danger);}
+  .btn-sm{padding:6px 10px;font-size:.74rem;}
+  .btn:disabled{opacity:.4;cursor:not-allowed;}
+
+  .tabs{display:flex;gap:4px;padding:0 28px;background:var(--bg-elev);border-bottom:1px solid var(--border);}
+  .tab{
+    padding:12px 16px;border:none;background:none;font-family:inherit;font-weight:600;font-size:.84rem;
+    color:var(--text-dim);border-bottom:2px solid transparent;cursor:pointer;display:flex;gap:8px;align-items:center;
+  }
+  .tab:hover{color:var(--accent);}
+  .tab.active{color:var(--accent);border-bottom-color:var(--accent);}
+  .tab .count{background:var(--accent-dim);color:var(--accent);border-radius:999px;padding:1px 8px;font-size:.7rem;}
+
+  main{flex:1;padding:24px 28px 60px;max-width:1700px;width:100%;margin:0 auto;}
+  .view{display:none;}
+  .view.active{display:block;}
+
+  .update-line{font-size:.75rem;color:var(--text-faint);margin:-8px 0 16px;}
+  .update-line.old{color:var(--warning);font-weight:600;}
+
+  .cards-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:22px;}
+  .card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;}
+  .card .label{font-size:.72rem;color:var(--text-dim);font-weight:600;text-transform:uppercase;letter-spacing:.5px;}
+  .card .value{font-size:1.7rem;font-weight:700;margin-top:6px;}
+  .card .value.accent{color:var(--accent);}
+  .card .value.warn{color:var(--warning);}
+  .card .value.lime{color:var(--lime);}
+  .card .sub{font-size:.72rem;color:var(--text-faint);margin-top:4px;}
+  .card.clickable{cursor:pointer;}
+  .card.clickable:hover{border-color:var(--accent-light);background:var(--card-hover);}
+
+  .panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
+  .panel-head{padding:14px 18px;border-bottom:1px solid var(--border);font-weight:700;font-size:.88rem;display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .panel-head small{font-weight:500;color:var(--text-faint);font-size:.72rem;}
+  .panel-body{padding:14px 18px;}
+  .dash-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(420px,1fr));gap:16px;margin-bottom:16px;}
+
+  .bar-row{display:grid;grid-template-columns:170px 1fr 70px;gap:10px;align-items:center;font-size:.78rem;padding:5px 0;}
+  .bar-row .bar-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--text-dim);}
+  .bar-track{background:var(--accent-dim);height:10px;border-radius:999px;overflow:hidden;}
+  .bar-fill{height:100%;background:var(--accent);border-radius:999px;}
+  .bar-row .bar-val{text-align:right;font-weight:600;}
+
+  .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);}
+  .toolbar input[type=text], .toolbar select{
+    background:var(--bg-elev);border:1px solid var(--border);color:var(--text);
+    padding:9px 12px;border-radius:8px;font-family:inherit;font-size:.8rem;
+  }
+  .toolbar input[type=text]{min-width:220px;flex:1;}
+  .toolbar select{cursor:pointer;}
+  .toolbar label.chk{font-size:.78rem;color:var(--text-dim);display:flex;align-items:center;gap:6px;cursor:pointer;}
+  .toolbar .spacer{flex:1;}
+  .toolbar-count{font-size:.75rem;color:var(--text-dim);white-space:nowrap;}
+
+  table{width:100%;border-collapse:collapse;font-size:.78rem;}
+  thead th{
+    text-align:left;padding:10px 12px;color:var(--text-faint);font-size:.66rem;text-transform:uppercase;
+    letter-spacing:.5px;font-weight:600;border-bottom:1px solid var(--border);white-space:nowrap;
+    position:sticky;top:0;background:var(--card);z-index:2;
+  }
+  thead th.sortable{cursor:pointer;user-select:none;}
+  thead th.sortable:hover{color:var(--accent);}
+  tbody td{padding:10px 12px;border-bottom:1px solid var(--border);vertical-align:top;}
+  tbody tr:hover{background:var(--card-hover);}
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr.row-nao{opacity:.55;}
+  tbody tr.row-sim td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
+  .table-wrap{overflow:auto;max-height:calc(100vh - 230px);}
+  .muted{color:var(--text-faint);}
+  .small{font-size:.7rem;}
+  .nowrap{white-space:nowrap;}
+
+  .col-objeto{min-width:300px;max-width:420px;}
+  .col-serv{min-width:200px;}
+  .col-atest{min-width:240px;max-width:340px;white-space:pre-line;}
+  .col-obs{min-width:180px;max-width:260px;white-space:pre-line;}
+  .clamp{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
+  .clamp.open{-webkit-line-clamp:unset;}
+  .more{color:var(--accent);cursor:pointer;font-size:.7rem;font-weight:600;}
+
+  .serv-item{margin-bottom:6px;}
+  .serv-line{display:flex;justify-content:space-between;gap:8px;font-size:.72rem;}
+  .serv-line b{color:var(--accent);}
+  .serv-bar{height:4px;background:var(--accent-dim);border-radius:999px;overflow:hidden;margin-top:2px;}
+  .serv-bar i{display:block;height:100%;background:var(--accent);}
+
+  .badge{display:inline-block;padding:3px 9px;border-radius:999px;font-size:.66rem;font-weight:700;white-space:nowrap;letter-spacing:.2px;}
+  .badge.accent{background:rgba(11,131,178,.12);color:var(--accent);}
+  .badge.info{background:rgba(37,99,235,.1);color:var(--info);}
+  .badge.lime{background:rgba(77,124,15,.12);color:var(--lime);}
+  .badge.warn{background:rgba(180,83,9,.12);color:var(--warning);}
+  .badge.danger{background:rgba(220,38,38,.1);color:var(--danger);}
+  .badge.grey{background:#E2E8F0;color:var(--text-dim);}
+  .badge.nova{background:#FEF3C7;color:#92400E;}
+  .badges{display:flex;flex-wrap:wrap;gap:4px;margin-top:4px;}
+
+  .int-group{display:flex;gap:4px;}
+  .int-btn{
+    padding:6px 11px;border-radius:999px;border:1px solid var(--border);background:#fff;font-family:inherit;
+    font-weight:700;font-size:.7rem;cursor:pointer;color:var(--text-dim);transition:.12s;
+  }
+  .int-btn:hover{border-color:var(--accent-light);}
+  .int-btn.sim.on{background:var(--accent);color:#fff;border-color:var(--accent);}
+  .int-btn.nao.on{background:var(--danger);color:#fff;border-color:var(--danger);}
+  .int-label{font-size:.62rem;color:var(--text-faint);text-transform:uppercase;letter-spacing:.4px;margin-bottom:4px;font-weight:600;}
+
+  .row-actions{display:flex;gap:6px;justify-content:flex-end;flex-wrap:wrap;}
+  .icon-btn{
+    min-width:28px;height:28px;border-radius:6px;border:1px solid var(--border);background:transparent;padding:0 8px;
+    color:var(--text-dim);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:600;font-family:inherit;
+  }
+  .icon-btn:hover{border-color:var(--accent);color:var(--accent);}
+
+  .empty-state{padding:50px 20px;text-align:center;color:var(--text-faint);font-size:.85rem;line-height:1.6;}
+
+  .decide-item{display:grid;grid-template-columns:90px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
+  .decide-item:last-child{border-bottom:none;}
+  .decide-item .obj{font-size:.76rem;}
+  .decide-item .org{font-size:.7rem;color:var(--text-faint);margin-top:2px;}
+
+  .modal-backdrop{
+    position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;
+    z-index:200;padding:20px;
+  }
+  .modal-backdrop.open{display:flex;}
+  .modal{background:var(--bg-elev);border:1px solid var(--border);border-radius:14px;width:100%;max-width:760px;max-height:90vh;overflow-y:auto;}
+  .modal-head{padding:18px 22px;border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;}
+  .modal-head h2{font-size:1rem;font-weight:700;}
+  .modal-close{background:none;border:none;color:var(--text-dim);font-size:1.1rem;cursor:pointer;}
+  .modal-body{padding:20px 22px;}
+  .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  .form-grid .full{grid-column:1/-1;}
+  .field label{display:block;font-size:.72rem;color:var(--text-dim);margin-bottom:6px;font-weight:600;}
+  .field input, .field select, .field textarea{
+    width:100%;background:var(--bg);border:1px solid var(--border);color:var(--text);
+    padding:9px 11px;border-radius:8px;font-family:inherit;font-size:.82rem;
+  }
+  .field textarea{resize:vertical;min-height:64px;}
+  .modal-foot{padding:16px 22px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;gap:10px;}
+  .modal-section-title{font-size:.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-dim);margin:18px 0 10px;display:flex;justify-content:space-between;}
+  .serv-row{display:grid;grid-template-columns:1fr 110px 32px;gap:8px;margin-bottom:8px;}
+  .serv-row input{background:var(--bg);border:1px solid var(--border);padding:8px 10px;border-radius:8px;font-family:inherit;font-size:.8rem;}
+  .serv-row button{border:1px solid var(--border);background:transparent;border-radius:6px;cursor:pointer;color:var(--text-dim);}
+  .serv-row button:hover{border-color:var(--danger);color:var(--danger);}
+  .readonly-box{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px 12px;font-size:.78rem;line-height:1.5;}
+
+  .progress{height:10px;background:var(--accent-dim);border-radius:999px;overflow:hidden;margin:6px 0 12px;}
+  .progress i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s;}
+  .log{background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:10px;font-size:.72rem;height:180px;overflow:auto;white-space:pre-line;color:var(--text-dim);}
+
+  .toast-wrap{position:fixed;bottom:20px;right:20px;display:flex;flex-direction:column;gap:8px;z-index:300;}
+  .toast{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--accent);
+    padding:12px 16px;border-radius:8px;font-size:.8rem;box-shadow:0 4px 16px rgba(0,0,0,.12);max-width:340px;}
+  .toast.error{border-left-color:var(--danger);}
+
+  @media (max-width:720px){
+    .form-grid{grid-template-columns:1fr;}
+    .dash-grid{grid-template-columns:1fr;}
+    .bar-row{grid-template-columns:110px 1fr 60px;}
+  }
+
+  @media print{
+    @page{size:A3 landscape;margin:8mm;}
+    body{background:#fff;}
+    header .header-actions, .tabs, .toolbar, .no-print, .update-line{display:none !important;}
+    header{position:static;}
+    main{padding:8px;max-width:none;}
+    .table-wrap{max-height:none;overflow:visible;}
+    .clamp{-webkit-line-clamp:unset;}
+    .panel{border:none;}
+    tbody tr{break-inside:avoid;}
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <header>
+    <div class="brand">
+      <img class="logo" src="logo-lm.png" alt="LM">
+      <div>
+        <h1>Controle de Licitações</h1>
+        <span>LM CONSTRUTORA — PAVIMENTAÇÃO · TERRAPLENAGEM · DRENAGEM</span>
+      </div>
+    </div>
+    <div class="header-actions">
+      <div class="status-pill" id="conn-status">
+        <span class="status-dot"></span>
+        <span id="conn-text">Modo local (este navegador)</span>
+      </div>
+      <button class="btn btn-ghost btn-sm" id="btn-export">Exportar Excel</button>
+      <button class="btn btn-ghost btn-sm" id="btn-print">Imprimir / PDF</button>
+      <button class="btn btn-ghost" id="btn-add">+ Nova licitação</button>
+      <button class="btn btn-accent" id="btn-pncp">⟳ Atualizar do PNCP</button>
+    </div>
+  </header>
+
+  <nav class="tabs">
+    <button class="tab active" data-view="dashboard">Dashboard</button>
+    <button class="tab" data-view="controle">Controle de licitações <span class="count" id="tab-count-controle">0</span></button>
+  </nav>
+
+  <main>
+    <div class="update-line" id="update-line"></div>
+
+    <!-- DASHBOARD -->
+    <section class="view active" id="view-dashboard">
+      <div class="cards-row" id="dash-cards"></div>
+
+      <div class="dash-grid">
+        <div class="panel">
+          <div class="panel-head">Decidir agora <small>oportunidades sem decisão, por prazo</small></div>
+          <div class="panel-body" id="dash-decidir"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Próximas sessões — vamos participar <small>interesse SIM</small></div>
+          <div class="panel-body" id="dash-proximas"></div>
+        </div>
+      </div>
+
+      <div class="dash-grid">
+        <div class="panel">
+          <div class="panel-head">Status das licitações em que vamos participar</div>
+          <div class="panel-body" id="dash-status"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Oportunidades abertas por serviço <small>pendentes + SIM</small></div>
+          <div class="panel-body" id="dash-servico"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Por modalidade</div>
+          <div class="panel-body" id="dash-modalidade"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Cidades com maior valor em aberto</div>
+          <div class="panel-body" id="dash-cidades"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CONTROLE -->
+    <section class="view" id="view-controle">
+      <div class="panel">
+        <div class="toolbar">
+          <input type="text" id="f-busca" placeholder="Buscar órgão, cidade, objeto, nº da licitação...">
+          <select id="f-interesse">
+            <option value="ativos">Pendentes + vamos participar</option>
+            <option value="pendentes">Só aguardando decisão</option>
+            <option value="sim">Só interesse SIM</option>
+            <option value="nao">Só interesse NÃO</option>
+            <option value="todos">Todas</option>
+          </select>
+          <select id="f-servico">
+            <option value="">Todos os serviços</option>
+            <option value="pav">Pavimentação</option>
+            <option value="ter">Terraplenagem</option>
+            <option value="dre">Drenagem</option>
+          </select>
+          <select id="f-tipo">
+            <option value="">Todos os tipos</option>
+            <option value="Obra">Obra</option>
+            <option value="Fornecimento">Fornecimento de material</option>
+          </select>
+          <select id="f-modalidade"><option value="">Todas as modalidades</option></select>
+          <select id="f-status"><option value="">Todos os status</option></select>
+          <select id="f-prazo">
+            <option value="">Qualquer prazo</option>
+            <option value="7">Sessão em até 7 dias</option>
+            <option value="15">Sessão em até 15 dias</option>
+            <option value="30">Sessão em até 30 dias</option>
+          </select>
+          <div class="spacer"></div>
+          <span class="toolbar-count" id="lic-count"></span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Interesse</th>
+                <th class="sortable" data-sort="dataSessao">Data</th>
+                <th class="sortable" data-sort="orgao">Órgão</th>
+                <th class="sortable" data-sort="cidade">Cidade</th>
+                <th>Nº licitação</th>
+                <th>Serviços / %</th>
+                <th class="sortable" data-sort="valor">Valor</th>
+                <th>Objeto</th>
+                <th>Atestados solicitados</th>
+                <th class="sortable" data-sort="status">Status</th>
+                <th>Observação</th>
+                <th>Garantia de proposta</th>
+                <th>Vencedora e desconto final</th>
+                <th class="no-print"></th>
+              </tr>
+            </thead>
+            <tbody id="lic-table"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<!-- MODAL: editar / nova licitação -->
+<div class="modal-backdrop" id="modal-lic">
+  <div class="modal">
+    <div class="modal-head">
+      <h2 id="modal-lic-title">Licitação</h2>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="field" style="margin-bottom:14px;">
+        <label>Temos interesse em participar?</label>
+        <div class="int-group" id="m-interesse">
+          <button type="button" class="int-btn sim" data-val="SIM">SIM, vamos participar</button>
+          <button type="button" class="int-btn nao" data-val="NAO">NÃO</button>
+          <button type="button" class="int-btn" data-val="">Ainda não decidimos</button>
+        </div>
+      </div>
+      <div id="m-pncp-box" class="readonly-box" style="margin-bottom:14px;display:none;"></div>
+      <div class="form-grid">
+        <div class="field">
+          <label>Data e hora da sessão</label>
+          <input type="datetime-local" id="m-data">
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select id="m-status"></select>
+        </div>
+        <div class="field">
+          <label>Órgão / cliente *</label>
+          <input type="text" id="m-orgao" placeholder="Ex: PREFEITURA, DNIT - MG, VINCI...">
+        </div>
+        <div class="field">
+          <label>Cidade / trecho</label>
+          <input type="text" id="m-cidade" placeholder="Ex: Juatuba, BR-262/MG">
+        </div>
+        <div class="field">
+          <label>Nº da licitação</label>
+          <input type="text" id="m-numero" placeholder="Ex: Concorrência Eletrônica 15/2026">
+        </div>
+        <div class="field">
+          <label>Valor estimado (R$)</label>
+          <input type="number" id="m-valor" step="0.01" min="0" placeholder="0,00">
+        </div>
+        <div class="field full">
+          <label>Objeto</label>
+          <textarea id="m-objeto" rows="3"></textarea>
+        </div>
+      </div>
+
+      <div class="modal-section-title"><span>Serviços e % do orçamento</span><span id="m-serv-soma" class="muted"></span></div>
+      <div id="m-servicos"></div>
+      <button class="btn btn-ghost btn-sm" id="m-add-serv" type="button" style="width:100%;justify-content:center;border-style:dashed;color:var(--accent);">+ Adicionar serviço</button>
+
+      <div class="form-grid" style="margin-top:16px;">
+        <div class="field full">
+          <label>Atestados solicitados (um por linha)</label>
+          <textarea id="m-atestados" rows="4" placeholder="Pavimentação asfáltica - CBUQ - 219,50 m³&#10;Drenagem pluvial - 48,50 m"></textarea>
+        </div>
+        <div class="field full">
+          <label>Observação</label>
+          <textarea id="m-obs" rows="3" placeholder="Modo de disputa, inversão de fases, impugnação, revisão enviada..."></textarea>
+        </div>
+        <div class="field">
+          <label>Garantia de proposta</label>
+          <input type="text" id="m-garantia" placeholder="Ex: SIM - R$ 47.590,60 / NÃO">
+        </div>
+        <div class="field">
+          <label>Vencedora e desconto final</label>
+          <input type="text" id="m-vencedora" placeholder="Ex: LM - 20,66%">
+        </div>
+        <div class="field full">
+          <label>Link do portal / edital</label>
+          <input type="text" id="m-link" placeholder="https://...">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger-ghost btn-sm" id="m-excluir" style="visibility:hidden;">Excluir</button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" data-close>Cancelar</button>
+        <button class="btn btn-accent" id="m-salvar">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: atualização PNCP -->
+<div class="modal-backdrop" id="modal-pncp">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-head">
+      <h2>Atualizando do PNCP</h2>
+    </div>
+    <div class="modal-body">
+      <div id="pncp-etapa" style="font-size:.85rem;font-weight:600;">Preparando...</div>
+      <div class="progress"><i id="pncp-bar"></i></div>
+      <div class="log" id="pncp-log"></div>
+      <p class="muted small" style="margin-top:10px;">Buscamos as licitações de MG com propostas abertas (concorrências, pregões e dispensas) e filtramos pavimentação asfáltica (drenagem e terraplenagem só quando vêm junto com pavimentação). Calçamento e serviços de gerenciamento/supervisão/projeto ficam de fora. O PNCP limita consultas seguidas, então há pausas: leva de 3 a 6 minutos.</p>
+    </div>
+    <div class="modal-foot">
+      <span class="muted small" id="pncp-resumo"></span>
+      <button class="btn btn-accent" id="pncp-fechar" disabled>Fechar</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast-wrap" id="toast-wrap"></div>
+
+<script type="module">
+/* Mesmo projeto Firebase do Controle LM e das Cotações, em coleções próprias ("licitacoes" e "licitacoes_meta"). */
+const firebaseConfig = {
+  apiKey: "AIzaSyDcNsjr0GdYPj70IF74G0hhhKc8qQ_jpkc",
+  authDomain: "lm-construtora-13c8f.firebaseapp.com",
+  projectId: "lm-construtora-13c8f",
+  storageBucket: "lm-construtora-13c8f.firebasestorage.app",
+  messagingSenderId: "384896887716",
+  appId: "1:384896887716:web:cfa633578043bda6a2af31"
+};
+
+const SITE_PASSWORD = "LM12";
+const ACTION_UNLOCK_KEY = "licUnlocked";
+function requireUnlock() {
+  if (sessionStorage.getItem(ACTION_UNLOCK_KEY) === "true") return true;
+  const attempt = prompt("Digite a senha para fazer essa alteração:");
+  if (attempt === null) return false;
+  if (attempt === SITE_PASSWORD) { sessionStorage.setItem(ACTION_UNLOCK_KEY, "true"); return true; }
+  toast("Senha incorreta.", true);
+  return false;
+}
+
+const COL_NAME = "licitacoes";
+const META_COL = "licitacoes_meta";
+const LS_KEY = "licitacoesLM";
+const LS_META = "licitacoesLM_meta";
+
+// ?local na URL usa só este navegador (para testes, sem mexer nos dados da equipe)
+const FORCAR_LOCAL = new URLSearchParams(location.search).has("local");
+let useFirebase = !FORCAR_LOCAL && firebaseConfig.apiKey && !firebaseConfig.apiKey.startsWith("COLE_AQUI");
+let db = null, fs = null;
+if (useFirebase) {
+  try {
+    const { initializeApp } = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js");
+    fs = await import("https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js");
+    const app = initializeApp(firebaseConfig);
+    db = fs.initializeFirestore(app, { experimentalAutoDetectLongPolling: true, useFetchStreams: false });
+  } catch (e) {
+    console.error("Falha ao iniciar Firebase, caindo para modo local:", e);
+    useFirebase = false;
+  }
+}
+
+function lsRead() {
+  try { return JSON.parse(localStorage.getItem(LS_KEY)) || []; }
+  catch { return []; }
+}
+function lsWrite(items) { localStorage.setItem(LS_KEY, JSON.stringify(items)); }
+
+function withTimeout(promiseFactory, ms = 20000) {
+  return Promise.race([
+    promiseFactory(),
+    new Promise((_, reject) => setTimeout(
+      () => reject(new Error("Conexão com o banco de dados demorou demais (mais de " + Math.round(ms/1000) + "s). Verifique sua internet/rede e tente novamente.")),
+      ms
+    ))
+  ]);
+}
+
+const store = {
+  async loadAll() {
+    if (useFirebase) {
+      return withTimeout(async () => {
+        const snap = await fs.getDocs(fs.collection(db, COL_NAME));
+        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      });
+    }
+    return lsRead();
+  },
+  // grava várias de uma vez, mesclando com o que já existe
+  async saveMany(entries) {
+    if (useFirebase) {
+      for (let i = 0; i < entries.length; i += 400) {
+        const batch = fs.writeBatch(db);
+        for (const e of entries.slice(i, i + 400)) batch.set(fs.doc(db, COL_NAME, e.id), e.data, { merge: true });
+        await withTimeout(() => batch.commit(), 60000);
+      }
+      return;
+    }
+    const map = new Map(lsRead().map(i => [i.id, i]));
+    for (const e of entries) map.set(e.id, { ...(map.get(e.id) || {}), ...e.data, id: e.id });
+    lsWrite([...map.values()]);
+  },
+  async update(id, data) { return this.saveMany([{ id, data }]); },
+  async add(data) {
+    if (useFirebase) {
+      const ref = await withTimeout(() => fs.addDoc(fs.collection(db, COL_NAME), data));
+      return ref.id;
+    }
+    const id = "local-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+    await this.saveMany([{ id, data }]);
+    return id;
+  },
+  async remove(id) {
+    if (useFirebase) return withTimeout(() => fs.deleteDoc(fs.doc(db, COL_NAME, id)));
+    lsWrite(lsRead().filter(i => i.id !== id));
+  },
+  async getMeta() {
+    if (useFirebase) {
+      const s = await withTimeout(() => fs.getDoc(fs.doc(db, META_COL, "pncp")));
+      return s.exists() ? s.data() : null;
+    }
+    try { return JSON.parse(localStorage.getItem(LS_META)); } catch { return null; }
+  },
+  async setMeta(m) {
+    if (useFirebase) return withTimeout(() => fs.setDoc(fs.doc(db, META_COL, "pncp"), m));
+    localStorage.setItem(LS_META, JSON.stringify(m));
+  }
+};
+
+/* ------------------------------ utilitários ------------------------------ */
+function toast(msg, isError) {
+  const wrap = document.getElementById("toast-wrap");
+  const el = document.createElement("div");
+  el.className = "toast" + (isError ? " error" : "");
+  el.textContent = msg;
+  wrap.appendChild(el);
+  setTimeout(() => el.remove(), 5000);
+}
+const sleep = ms => new Promise(r => setTimeout(r, ms));
+function pad(n) { return String(n).padStart(2, "0"); }
+function localIso(d) { return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`; }
+function fmtDateTime(iso) {
+  if (!iso) return "";
+  const [d, t] = iso.split("T");
+  const [y, m, dd] = d.split("-");
+  const hm = (t || "").slice(0, 5);
+  return `${dd}/${m}/${y}` + (hm && hm !== "00:00" ? ` ${hm}` : "");
+}
+function fmtMoney(v) {
+  if (v === undefined || v === null || v === "" || isNaN(Number(v))) return "";
+  return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+function fmtMoneyCurto(v) {
+  v = Number(v) || 0;
+  if (v >= 1e6) return "R$ " + (v / 1e6).toLocaleString("pt-BR", { maximumFractionDigits: 1 }) + " mi";
+  if (v >= 1e3) return "R$ " + (v / 1e3).toLocaleString("pt-BR", { maximumFractionDigits: 0 }) + " mil";
+  return fmtMoney(v);
+}
+function escapeHtml(s) {
+  return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c]));
+}
+function safeUrl(u) { return /^https?:\/\//i.test(u || "") ? u : ""; }
+function diasAte(iso) {
+  if (!iso) return null;
+  const alvo = new Date(iso);
+  if (isNaN(alvo)) return null;
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const dia = new Date(alvo); dia.setHours(0, 0, 0, 0);
+  return Math.round((dia - hoje) / 86400000);
+}
+
+/* ------------------------------ regras de negócio ------------------------------ */
+const STATUS = [
+  "EM ANÁLISE", "ATENDEMOS OS ATESTADOS", "NÃO ATENDEMOS OS ATESTADOS", "EM ANDAMENTO",
+  "PROPOSTA ENVIADA", "SUSPENSO", "GANHAMOS", "PERDEMOS", "FRACASSADA / DESERTA", "CANCELADA"
+];
+const STATUS_FINAIS = ["GANHAMOS", "PERDEMOS", "FRACASSADA / DESERTA", "CANCELADA"];
+function statusClasse(s) {
+  if (s === "GANHAMOS") return "lime";
+  if (s === "PERDEMOS" || s === "NÃO ATENDEMOS OS ATESTADOS" || s === "CANCELADA") return "danger";
+  if (s === "SUSPENSO" || s === "FRACASSADA / DESERTA") return "warn";
+  if (s === "PROPOSTA ENVIADA") return "info";
+  return "accent";
+}
+
+const MODALIDADES = { 4: "Concorrência Eletrônica", 5: "Concorrência Presencial", 6: "Pregão Eletrônico", 8: "Dispensa" };
+const RX = {
+  pav: /pavimenta|asfalt|cbuq|recapeamento|micro\s*-?\s*revestimento|microrrevestimento|tratamento superficial|\btsd\b|\btss\b|tapa\s*-?\s*buracos?|fresagem/,
+  ter: /terraplen|terraplan|movimenta\w* de terra|movimento de terra/,
+  dre: /drenagem|aguas pluviais|galerias? pluvia|bueiro/,
+  // "drenagem" sozinha aparece em reformas de prédio; só conta com contexto de via/urbano
+  dreCtx: /pluvia|urbana|\bvias?\b|\bruas?\b|estrada|rodovia|avenida|bairro|pavimenta|canal|corrego|manejo|bueiro/,
+  neutro: /manta asfaltica|superficies pavimentadas|nao pavimentadas/g,
+  excluir: /banheiros? quimicos|\bcaminh(ao|oes)\b|\bveiculos?\b|vassour|ferramentas|placa vibratoria|formas? para bloquete|\bpneus?\b|uniformes?\b/,
+  // calçamento (bloquete/intertravado) fica de fora, salvo se o edital também tiver asfalto
+  calc: /calcamento|bloquete|intertravad|sextavad|paralelep|polied|\bpedra\b|blocos? de concreto/,
+  asf: /asfalt|cbuq|betuminoso|recapeamento|micro\s*-?\s*revestimento|microrrevestimento|tratamento superficial|\btsd\b|\btss\b|\bpmf\b|tapa\s*-?\s*buracos?|fresagem/,
+  tec: /\b(consultoria|gerenciamento|supervisao|fiscalizacao)\b|elaboracao de (estudos|projetos?)/,
+  forn: /\b(aquisicao|compra)\b/
+};
+function norm(s) { return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+function classificar(objeto) {
+  const n = norm(objeto).replace(RX.neutro, " ");
+  const pav = RX.pav.test(n), ter = RX.ter.test(n), dre = RX.dre.test(n) && RX.dreCtx.test(n);
+  const asfalto = RX.asf.test(n);
+  // só pavimentação asfáltica; drenagem e terraplenagem entram apenas junto com pavimentação
+  if (!pav) return null;
+  if (RX.excluir.test(n)) return null;
+  if (RX.calc.test(n) && !asfalto) return null;
+  // gerenciamento, supervisão, consultoria e projetos ficam de fora
+  if (RX.tec.test(n) && !/integrada/.test(n)) return null;
+  const tipo = RX.forn.test(n) && !/execucao|executar|prestacao de servico/.test(n) ? "Fornecimento" : "Obra";
+  const chave = n.replace(/^\s*\[[^\]]*\]\s*-?\s*/, "").replace(/[^a-z0-9]/g, "");
+  return { pav, ter, dre, asfalto, tipo, chave };
+}
+function servicosIniciais(c) {
+  const lista = [];
+  if (c.pav) lista.push("PAVIMENTAÇÃO");
+  if (c.ter) lista.push("TERRAPLENAGEM");
+  if (c.dre) lista.push("DRENAGEM");
+  // com um serviço só, o objeto inteiro é dele; misto precisa da planilha orçamentária
+  return lista.length === 1 ? [{ nome: lista[0], pct: 100 }] : [];
+}
+function servicosDetectados(l) {
+  const p = l.pncp || {};
+  const out = [];
+  if (p.pav) out.push("Pavimentação");
+  if (p.ter) out.push("Terraplenagem");
+  if (p.dre) out.push("Drenagem");
+  return out;
+}
+
+function isAtiva(l) {
+  if (l.origem !== "PNCP") return !STATUS_FINAIS.includes(l.status);
+  if (l.naListaPncp === false) return false;
+  return !l.dataSessao || l.dataSessao >= localIso(new Date());
+}
+function isPendente(l) { return !l.interesse && isAtiva(l); }
+function isSim(l) { return l.interesse === "SIM"; }
+
+/* ------------------------------ estado ------------------------------ */
+let licitacoes = [];
+let meta = null;
+let editingId = null;
+let modalInteresse = "";
+let sortKey = "dataSessao";
+let sortDir = "asc";
+
+async function init() {
+  try {
+    [licitacoes, meta] = await Promise.all([store.loadAll(), store.getMeta()]);
+    setConnStatus(true);
+  } catch (e) {
+    console.error(e);
+    toast(e.message || "Erro ao carregar licitações.", true);
+    setConnStatus(false);
+  }
+  renderAll();
+}
+
+function setConnStatus(ok) {
+  const pill = document.getElementById("conn-status");
+  const text = document.getElementById("conn-text");
+  if (!useFirebase) { text.textContent = FORCAR_LOCAL ? "Modo teste (só este navegador)" : "Modo local (este navegador)"; pill.classList.remove("ok"); return; }
+  pill.classList.toggle("ok", ok);
+  text.textContent = ok ? "Sincronizado (nuvem)" : "Falha de conexão";
+}
+
+function renderAll() {
+  renderUpdateLine();
+  renderFilters();
+  renderDashboard();
+  renderTabela();
+}
+
+function renderUpdateLine() {
+  const el = document.getElementById("update-line");
+  if (!meta || !meta.em) {
+    el.className = "update-line old";
+    el.textContent = "Ainda não buscamos no PNCP. Clique em “⟳ Atualizar do PNCP” para trazer as licitações abertas.";
+    return;
+  }
+  const quando = new Date(meta.em);
+  const dias = Math.floor((Date.now() - quando) / 86400000);
+  el.className = "update-line" + (dias >= 7 ? " old" : "");
+  el.textContent = `Última atualização do PNCP: ${quando.toLocaleString("pt-BR")} — ${meta.relevantes} relevantes de ${meta.totalColetadas} licitações abertas em MG, ${meta.novos} novas.`
+    + (dias >= 7 ? " Faz mais de uma semana: vale atualizar." : "");
+}
+
+/* ------------------------------ dashboard ------------------------------ */
+function barras(containerId, pares, fmt) {
+  const el = document.getElementById(containerId);
+  pares = pares.filter(p => p[1] > 0);
+  if (!pares.length) { el.innerHTML = `<div class="empty-state" style="padding:20px;">Sem dados ainda.</div>`; return; }
+  const max = Math.max(...pares.map(p => p[1]));
+  el.innerHTML = pares.map(([label, v]) => `
+    <div class="bar-row">
+      <span class="bar-label" title="${escapeHtml(label)}">${escapeHtml(label)}</span>
+      <div class="bar-track"><div class="bar-fill" style="width:${Math.max(3, v / max * 100)}%"></div></div>
+      <span class="bar-val">${fmt ? fmt(v) : v}</span>
+    </div>`).join("");
+}
+
+function interesseBotoes(l) {
+  return `<div class="int-group">
+    <button class="int-btn sim ${l.interesse === "SIM" ? "on" : ""}" data-int="SIM" data-id="${escapeHtml(l.id)}" title="Vamos participar">SIM</button>
+    <button class="int-btn nao ${l.interesse === "NAO" ? "on" : ""}" data-int="NAO" data-id="${escapeHtml(l.id)}" title="Não vamos participar">NÃO</button>
+  </div>`;
+}
+
+function prazoBadge(l) {
+  const d = diasAte(l.dataSessao);
+  if (d === null) return "";
+  if (d < 0) return `<span class="badge grey">encerrada</span>`;
+  if (d === 0) return `<span class="badge danger">HOJE</span>`;
+  if (d <= 3) return `<span class="badge danger">${d} dia${d > 1 ? "s" : ""}</span>`;
+  if (d <= 7) return `<span class="badge warn">${d} dias</span>`;
+  return `<span class="badge accent">${d} dias</span>`;
+}
+
+function renderDashboard() {
+  const pend = licitacoes.filter(isPendente);
+  const sim = licitacoes.filter(isSim);
+  const simAndamento = sim.filter(l => !STATUS_FINAIS.includes(l.status));
+  const semana = licitacoes.filter(l => (isPendente(l) || (isSim(l) && !STATUS_FINAIS.includes(l.status))) && (() => { const d = diasAte(l.dataSessao); return d !== null && d >= 0 && d <= 7; })());
+  const valorDisputa = simAndamento.reduce((s, l) => s + (Number(l.valor) || 0), 0);
+  const ganhas = sim.filter(l => l.status === "GANHAMOS").length;
+  const perdidas = sim.filter(l => l.status === "PERDEMOS").length;
+  const novas = pend.filter(l => meta && l.lote === meta.em).length;
+
+  const cards = [
+    { label: "Aguardando decisão", value: pend.length, cls: "warn", sub: `${novas} novas na última atualização`, go: "pendentes" },
+    { label: "Vamos participar", value: simAndamento.length, cls: "accent", sub: "interesse SIM em andamento", go: "sim" },
+    { label: "Sessões em 7 dias", value: semana.length, cls: "", sub: "pendentes + vamos participar", go: "prazo7" },
+    { label: "Valor em disputa", value: fmtMoneyCurto(valorDisputa), cls: "accent", sub: "soma das que vamos participar" },
+    { label: "Ganhamos", value: ganhas, cls: "lime", sub: `${perdidas} perdidas` },
+  ];
+  document.getElementById("dash-cards").innerHTML = cards.map(c => `
+    <div class="card ${c.go ? "clickable" : ""}" ${c.go ? `data-go="${c.go}"` : ""}>
+      <div class="label">${c.label}</div>
+      <div class="value ${c.cls}">${c.value}</div>
+      <div class="sub">${c.sub}</div>
+    </div>`).join("");
+
+  // decidir agora
+  const decidir = [...pend].sort((a, b) => (a.dataSessao || "9").localeCompare(b.dataSessao || "9")).slice(0, 10);
+  document.getElementById("dash-decidir").innerHTML = decidir.length ? decidir.map(l => `
+    <div class="decide-item">
+      <div><div style="font-weight:600;font-size:.76rem;">${fmtDateTime(l.dataSessao).slice(0, 10)}</div>${prazoBadge(l)}</div>
+      <div>
+        <div class="obj clamp" style="-webkit-line-clamp:2;">${escapeHtml(l.objeto)}</div>
+        <div class="org">${escapeHtml(l.cidade)} · ${escapeHtml(l.orgao)} · ${fmtMoney(l.valor) || "valor n/i"}</div>
+      </div>
+      ${interesseBotoes(l)}
+    </div>`).join("") + (pend.length > 10 ? `<div style="padding-top:10px;"><button class="btn btn-ghost btn-sm" data-go="pendentes">Ver todas as ${pend.length} pendentes →</button></div>` : "")
+    : `<div class="empty-state" style="padding:20px;">Nada pendente. ${meta ? "" : "Atualize do PNCP para ver as oportunidades."}</div>`;
+
+  // próximas sessões SIM
+  const prox = simAndamento.filter(l => { const d = diasAte(l.dataSessao); return d === null || d >= 0; })
+    .sort((a, b) => (a.dataSessao || "9").localeCompare(b.dataSessao || "9")).slice(0, 10);
+  document.getElementById("dash-proximas").innerHTML = prox.length ? `<table><tbody>${prox.map(l => `
+    <tr data-edit="${escapeHtml(l.id)}" style="cursor:pointer;">
+      <td class="nowrap"><b>${fmtDateTime(l.dataSessao)}</b><div>${prazoBadge(l)}</div></td>
+      <td><div class="clamp" style="-webkit-line-clamp:2;">${escapeHtml(l.objeto)}</div><div class="muted small">${escapeHtml(l.cidade)} · ${escapeHtml(l.orgao)}</div></td>
+      <td class="nowrap">${fmtMoney(l.valor)}</td>
+      <td>${l.status ? `<span class="badge ${statusClasse(l.status)}">${escapeHtml(l.status)}</span>` : ""}</td>
+    </tr>`).join("")}</tbody></table>`
+    : `<div class="empty-state" style="padding:20px;">Marque SIM nas licitações em que vamos participar para elas aparecerem aqui.</div>`;
+
+  const contar = (lista, fn) => { const m = new Map(); for (const l of lista) for (const k of [].concat(fn(l))) if (k) m.set(k, (m.get(k) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
+  barras("dash-status", contar(sim, l => l.status || "SEM STATUS"));
+  const abertas = licitacoes.filter(l => isPendente(l) || (isSim(l) && isAtiva(l)));
+  barras("dash-servico", contar(abertas, l => l.origem === "PNCP" ? servicosDetectados(l) : (l.servicos || []).map(s => s.nome)).slice(0, 8));
+  barras("dash-modalidade", contar(abertas, l => l.modalidade || "Não informada").slice(0, 8));
+  const porCidade = new Map();
+  for (const l of abertas) porCidade.set(l.cidade || "—", (porCidade.get(l.cidade || "—") || 0) + (Number(l.valor) || 0));
+  barras("dash-cidades", [...porCidade.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10), fmtMoneyCurto);
+}
+
+/* ------------------------------ tabela de controle ------------------------------ */
+function distinct(fn) { return [...new Set(licitacoes.map(fn).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR")); }
+function fillSelect(select, values) {
+  const current = select.value;
+  select.innerHTML = select.options[0].outerHTML + values.map(v => `<option value="${escapeHtml(v)}">${escapeHtml(v)}</option>`).join("");
+  if (values.includes(current)) select.value = current;
+}
+function renderFilters() {
+  fillSelect(document.getElementById("f-modalidade"), distinct(l => l.modalidade));
+  fillSelect(document.getElementById("f-status"), [...new Set([...STATUS, ...distinct(l => l.status)])]);
+}
+
+function getFiltered() {
+  const busca = norm(document.getElementById("f-busca").value.trim());
+  const fInt = document.getElementById("f-interesse").value;
+  const fServ = document.getElementById("f-servico").value;
+  const fTipo = document.getElementById("f-tipo").value;
+  const fMod = document.getElementById("f-modalidade").value;
+  const fStatus = document.getElementById("f-status").value;
+  const fPrazo = Number(document.getElementById("f-prazo").value) || 0;
+
+  const list = licitacoes.filter(l => {
+    if (fInt === "ativos" && !(isPendente(l) || isSim(l) || (l.origem !== "PNCP" && l.interesse !== "NAO"))) return false;
+    if (fInt === "pendentes" && !isPendente(l)) return false;
+    if (fInt === "sim" && !isSim(l)) return false;
+    if (fInt === "nao" && l.interesse !== "NAO") return false;
+    if (fServ) {
+      const p = l.pncp || {};
+      const nomes = norm((l.servicos || []).map(s => s.nome).join(" "));
+      const ok = { pav: p.pav || /paviment|asfalt|cbuq|recape/.test(nomes), ter: p.ter || /terrapl/.test(nomes), dre: p.dre || /drenag/.test(nomes) }[fServ];
+      if (!ok) return false;
+    }
+    if (fTipo && (l.pncp?.tipo || "Obra") !== fTipo) return false;
+    if (fMod && l.modalidade !== fMod) return false;
+    if (fStatus && l.status !== fStatus) return false;
+    if (fPrazo) { const d = diasAte(l.dataSessao); if (d === null || d < 0 || d > fPrazo) return false; }
+    if (busca) {
+      const hay = norm([l.orgao, l.cidade, l.objeto, l.numero, l.observacao, l.atestados, l.status].join(" "));
+      if (!hay.includes(busca)) return false;
+    }
+    return true;
+  });
+
+  list.sort((a, b) => {
+    let av = a[sortKey], bv = b[sortKey];
+    if (sortKey === "valor") { av = Number(av) || 0; bv = Number(bv) || 0; }
+    else { av = norm(av || (sortDir === "asc" ? "~" : "")); bv = norm(bv || (sortDir === "asc" ? "~" : "")); }
+    if (av < bv) return sortDir === "asc" ? -1 : 1;
+    if (av > bv) return sortDir === "asc" ? 1 : -1;
+    return 0;
+  });
+  return list;
+}
+
+function servicosHtml(l) {
+  const lista = l.servicos || [];
+  if (lista.length) {
+    return lista.map(s => `
+      <div class="serv-item">
+        <div class="serv-line"><span>${escapeHtml(s.nome)}</span><b>${s.pct !== "" && s.pct != null ? Number(s.pct).toLocaleString("pt-BR") + "%" : ""}</b></div>
+        ${s.pct ? `<div class="serv-bar"><i style="width:${Math.min(100, Number(s.pct))}%"></i></div>` : ""}
+      </div>`).join("");
+  }
+  const det = servicosDetectados(l);
+  return det.length ? `<div class="badges">${det.map(d => `<span class="badge grey">${d}</span>`).join("")}</div><div class="muted small" style="margin-top:4px;">misto — conferir % na planilha</div>` : `<span class="muted">—</span>`;
+}
+
+function renderTabela() {
+  const list = getFiltered();
+  document.getElementById("lic-count").textContent = `${list.length} licitaç${list.length === 1 ? "ão" : "ões"}`;
+  document.getElementById("tab-count-controle").textContent = licitacoes.filter(l => isPendente(l) || isSim(l)).length;
+  const tbody = document.getElementById("lic-table");
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="14"><div class="empty-state">${licitacoes.length
+      ? "Nenhuma licitação com esses filtros."
+      : "Nenhuma licitação ainda.<br>Clique em <b>⟳ Atualizar do PNCP</b> para buscar as abertas em MG, ou em <b>+ Nova licitação</b> para cadastrar uma privada (VINCI, ITINERA...)."}</div></td></tr>`;
+    return;
+  }
+  tbody.innerHTML = list.map(l => {
+    const p = l.pncp || {};
+    const novo = meta && l.lote === meta.em && !l.interesse;
+    const linkPortal = safeUrl(l.linkPortal);
+    const linkPncp = safeUrl(p.linkPncp);
+    return `
+    <tr class="${l.interesse === "NAO" ? "row-nao" : l.interesse === "SIM" ? "row-sim" : ""}">
+      <td>${interesseBotoes(l)}</td>
+      <td class="nowrap"><b>${fmtDateTime(l.dataSessao) || "—"}</b><div class="badges">${prazoBadge(l)}${novo ? `<span class="badge nova">NOVA</span>` : ""}</div></td>
+      <td>${escapeHtml(l.orgao)}${p.esfera ? `<div class="muted small">${escapeHtml(p.esfera)}</div>` : l.origem !== "PNCP" ? `<div class="muted small">privada / manual</div>` : ""}</td>
+      <td>${escapeHtml(l.cidade)}</td>
+      <td>${escapeHtml(l.numero)}${l.modalidade ? `<div class="muted small">${escapeHtml(l.modalidade)}</div>` : ""}</td>
+      <td class="col-serv">${servicosHtml(l)}</td>
+      <td class="nowrap">${fmtMoney(l.valor) || `<span class="muted">sigiloso / n/i</span>`}</td>
+      <td class="col-objeto"><div class="clamp">${escapeHtml(l.objeto)}</div>${(l.objeto || "").length > 260 ? `<span class="more" data-more>ver tudo</span>` : ""}
+        ${(p.tipo && p.tipo !== "Obra") || p.asfalto === false ? `<div class="badges">${p.tipo && p.tipo !== "Obra" ? `<span class="badge info">${escapeHtml(p.tipo)}</span>` : ""}${p.asfalto === false ? `<span class="badge warn" title="O objeto não diz se é asfáltica — conferir no edital">tipo de pavimento não informado — conferir</span>` : ""}</div>` : ""}</td>
+      <td class="col-atest">${escapeHtml(l.atestados) || `<span class="muted">—</span>`}</td>
+      <td>${l.status ? `<span class="badge ${statusClasse(l.status)}">${escapeHtml(l.status)}</span>` : `<span class="muted">—</span>`}</td>
+      <td class="col-obs">${escapeHtml(l.observacao)}</td>
+      <td>${escapeHtml(l.garantiaProposta)}</td>
+      <td>${escapeHtml(l.vencedora)}</td>
+      <td class="no-print"><div class="row-actions">
+        <button class="icon-btn" data-edit="${escapeHtml(l.id)}" title="Editar / preencher">Editar</button>
+        ${linkPncp ? `<a class="icon-btn" href="${escapeHtml(linkPncp)}" target="_blank" rel="noopener" title="Abrir no PNCP (edital e anexos)">PNCP</a>` : ""}
+        ${linkPortal ? `<a class="icon-btn" href="${escapeHtml(linkPortal)}" target="_blank" rel="noopener" title="Abrir portal de origem">Portal</a>` : ""}
+      </div></td>
+    </tr>`;
+  }).join("");
+}
+
+/* ------------------------------ interesse SIM / NÃO ------------------------------ */
+async function setInteresse(id, valor) {
+  const l = licitacoes.find(x => x.id === id);
+  if (!l) return;
+  if (!requireUnlock()) return;
+  const novo = l.interesse === valor ? null : valor;
+  const data = { interesse: novo, atualizadoEm: new Date().toISOString() };
+  if (novo === "SIM" && !l.status) data.status = "EM ANÁLISE";
+  try {
+    await store.update(id, data);
+    Object.assign(l, data);
+    renderAll();
+    toast(novo === "SIM" ? "Marcada: vamos participar." : novo === "NAO" ? "Marcada: não vamos participar." : "Decisão desfeita.");
+  } catch (e) { toast(e.message || "Erro ao salvar.", true); }
+}
+
+/* ------------------------------ modal de edição ------------------------------ */
+const modalLic = document.getElementById("modal-lic");
+function servRowHtml(s = {}) {
+  return `<div class="serv-row">
+    <input type="text" class="sv-nome" placeholder="Ex: PAVIMENTAÇÃO, TERRAPLENAGEM, DRENAGEM..." value="${escapeHtml(s.nome || "")}">
+    <input type="number" class="sv-pct" placeholder="%" step="0.01" min="0" max="100" value="${s.pct ?? ""}">
+    <button type="button" class="sv-del" title="Remover">✕</button>
+  </div>`;
+}
+function atualizarSomaServ() {
+  const soma = [...document.querySelectorAll("#m-servicos .sv-pct")].reduce((s, i) => s + (Number(i.value) || 0), 0);
+  const el = document.getElementById("m-serv-soma");
+  el.textContent = soma ? `soma: ${soma.toLocaleString("pt-BR")}%` : "";
+  el.style.color = soma && Math.abs(soma - 100) > 0.5 ? "var(--warning)" : "";
+}
+function setModalInteresse(v) {
+  modalInteresse = v;
+  document.querySelectorAll("#m-interesse .int-btn").forEach(b => b.classList.toggle("on", b.dataset.val === v && v !== ""));
+}
+
+function abrirModal(id) {
+  editingId = id || null;
+  const l = id ? licitacoes.find(x => x.id === id) : { origem: "MANUAL", interesse: "SIM", servicos: [] };
+  document.getElementById("modal-lic-title").textContent = id ? "Licitação" : "Nova licitação (privada / manual)";
+  setModalInteresse(l.interesse || "");
+  document.getElementById("m-data").value = (l.dataSessao || "").slice(0, 16);
+  const selStatus = document.getElementById("m-status");
+  const opcoes = [...new Set(["", ...STATUS, l.status || ""])];
+  selStatus.innerHTML = opcoes.map(s => `<option value="${escapeHtml(s)}">${s ? escapeHtml(s) : "— sem status —"}</option>`).join("");
+  selStatus.value = l.status || "";
+  document.getElementById("m-orgao").value = l.orgao || "";
+  document.getElementById("m-cidade").value = l.cidade || "";
+  document.getElementById("m-numero").value = l.numero || "";
+  document.getElementById("m-valor").value = l.valor ?? "";
+  document.getElementById("m-objeto").value = l.objeto || "";
+  document.getElementById("m-servicos").innerHTML = (l.servicos && l.servicos.length ? l.servicos : [{}]).map(servRowHtml).join("");
+  atualizarSomaServ();
+  document.getElementById("m-atestados").value = l.atestados || "";
+  document.getElementById("m-obs").value = l.observacao || "";
+  document.getElementById("m-garantia").value = l.garantiaProposta || "";
+  document.getElementById("m-vencedora").value = l.vencedora || "";
+  document.getElementById("m-link").value = l.linkPortal || "";
+
+  const box = document.getElementById("m-pncp-box");
+  const p = l.pncp;
+  if (p) {
+    const det = servicosDetectados(l);
+    box.style.display = "block";
+    box.innerHTML = `<b>Dados do PNCP</b> — ${escapeHtml(p.modalidade)} · ${escapeHtml(p.esfera)} · ${escapeHtml(p.situacao)}<br>
+      Prazo de propostas: ${fmtDateTime(p.dataEncerramento) || "n/i"} · Serviços detectados: ${det.join(", ") || "—"} · Tipo: ${escapeHtml(p.tipo)}
+      ${p.publicadoVezes > 1 ? `<br>Publicado ${p.publicadoVezes}x no PNCP com o mesmo objeto.` : ""}
+      <br><a href="${escapeHtml(safeUrl(p.linkPncp))}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;">Abrir no PNCP (edital e anexos) →</a>`;
+  } else box.style.display = "none";
+  document.getElementById("m-excluir").style.visibility = id && l.origem !== "PNCP" ? "visible" : "hidden";
+  modalLic.classList.add("open");
+}
+
+async function salvarModal() {
+  if (!requireUnlock()) return;
+  const orgao = document.getElementById("m-orgao").value.trim();
+  if (!orgao) { toast("Preencha o órgão / cliente.", true); return; }
+  const dataIn = document.getElementById("m-data").value;
+  const valorIn = document.getElementById("m-valor").value;
+  const dados = {
+    interesse: modalInteresse || null,
+    dataSessao: dataIn ? dataIn + ":00" : "",
+    status: document.getElementById("m-status").value,
+    orgao,
+    cidade: document.getElementById("m-cidade").value.trim(),
+    numero: document.getElementById("m-numero").value.trim(),
+    valor: valorIn === "" ? null : Number(valorIn),
+    objeto: document.getElementById("m-objeto").value.trim(),
+    servicos: [...document.querySelectorAll("#m-servicos .serv-row")].map(r => ({
+      nome: r.querySelector(".sv-nome").value.trim().toUpperCase(),
+      pct: r.querySelector(".sv-pct").value === "" ? null : Number(r.querySelector(".sv-pct").value)
+    })).filter(s => s.nome),
+    atestados: document.getElementById("m-atestados").value.trim(),
+    observacao: document.getElementById("m-obs").value.trim(),
+    garantiaProposta: document.getElementById("m-garantia").value.trim(),
+    vencedora: document.getElementById("m-vencedora").value.trim(),
+    linkPortal: document.getElementById("m-link").value.trim(),
+    atualizadoEm: new Date().toISOString()
+  };
+  try {
+    if (editingId) {
+      const atual = licitacoes.find(x => x.id === editingId);
+      // campos do PNCP alterados à mão não são mais sobrescritos nas próximas atualizações
+      if (atual.origem === "PNCP") {
+        const editados = new Set(atual.camposEditados || []);
+        for (const k of CAMPOS_PNCP) if (String(dados[k] ?? "") !== String(atual[k] ?? "")) editados.add(k);
+        dados.camposEditados = [...editados];
+      }
+      await store.update(editingId, dados);
+      Object.assign(atual, dados);
+    } else {
+      const novo = { ...dados, origem: "MANUAL", criadoEm: dados.atualizadoEm };
+      const id = await store.add(novo);
+      licitacoes.push({ id, ...novo });
+    }
+    modalLic.classList.remove("open");
+    renderAll();
+    toast("Licitação salva.");
+  } catch (e) { toast(e.message || "Erro ao salvar.", true); }
+}
+
+async function excluirAtual() {
+  if (!editingId || !requireUnlock()) return;
+  if (!confirm("Excluir esta licitação cadastrada manualmente?")) return;
+  try {
+    await store.remove(editingId);
+    licitacoes = licitacoes.filter(l => l.id !== editingId);
+    modalLic.classList.remove("open");
+    renderAll();
+    toast("Licitação excluída.");
+  } catch (e) { toast(e.message || "Erro ao excluir.", true); }
+}
+
+/* ------------------------------ atualização a partir do PNCP ------------------------------ */
+const CAMPOS_PNCP = ["dataSessao", "orgao", "cidade", "numero", "modalidade", "objeto", "valor", "linkPortal"];
+
+function montarPncp(it, c, vezes) {
+  const esferas = { M: "Municipal", E: "Estadual", F: "Federal", D: "Distrital", N: "Consórcio / outros" };
+  const esferaId = it.orgaoEntidade?.esferaId || "";
+  const prefixo = ((it.objetoCompra || "").match(/^\s*\[([^\]]+)\]/) || [])[1] || "";
+  const municipio = it.unidadeOrgao?.municipioNome || "";
+  return {
+    numeroControle: it.numeroControlePNCP || "",
+    cnpj: it.orgaoEntidade?.cnpj || "",
+    orgao: it.orgaoEntidade?.razaoSocial || "",
+    esfera: esferas[esferaId] || esferaId,
+    cidade: esferaId === "M" || !esferaId ? municipio : `${municipio} (sede do órgão)`,
+    numero: `${it.numeroCompra || ""}/${it.anoCompra || ""}` + (it.processo ? ` — Proc. ${it.processo}` : ""),
+    modalidade: it.modalidadeNome || "",
+    objeto: (it.objetoCompra || "").trim(),
+    valor: Number(it.valorTotalEstimado) > 0 ? Number(it.valorTotalEstimado) : null,
+    dataAbertura: it.dataAberturaProposta || "",
+    dataEncerramento: it.dataEncerramentoProposta || "",
+    dataPublicacao: it.dataPublicacaoPncp || "",
+    situacao: it.situacaoCompraNome || "",
+    linkOrigem: safeUrl(it.linkSistemaOrigem) || "",
+    portalNome: prefixo,
+    linkPncp: `https://pncp.gov.br/app/editais/${it.orgaoEntidade?.cnpj}/${it.anoCompra}/${it.sequencialCompra}`,
+    tipo: c.tipo, pav: c.pav, ter: c.ter, dre: c.dre, asfalto: c.asfalto,
+    publicadoVezes: vezes
+  };
+}
+function camposDoPncp(p) {
+  return {
+    dataSessao: p.dataEncerramento, orgao: p.orgao, cidade: p.cidade, numero: p.numero,
+    modalidade: p.modalidade, objeto: p.objeto, valor: p.valor, linkPortal: p.linkOrigem
+  };
+}
+function docId(it) { return "pncp_" + String(it.numeroControlePNCP).replace(/[^\w-]/g, "_"); }
+
+async function buscarPagina(mod, pag, dataFinal, log) {
+  const url = `https://pncp.gov.br/api/consulta/v1/contratacoes/proposta?dataFinal=${dataFinal}&uf=MG&codigoModalidadeContratacao=${mod}&tamanhoPagina=50&pagina=${pag}`;
+  for (let t = 1; t <= 4; t++) {
+    try {
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), 40000);
+      const r = await fetch(url, { signal: ctrl.signal });
+      clearTimeout(timer);
+      if (r.status === 204) return { data: [], totalPaginas: 0 };
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      return await r.json();
+    } catch (e) {
+      const espera = 30 * t;
+      log(`  falha (tentativa ${t}): ${e.name === "AbortError" ? "tempo esgotado" : e.message} — aguardando ${espera}s (o PNCP limita consultas seguidas)`);
+      await sleep(espera * 1000);
+    }
+  }
+  return null;
+}
+
+async function atualizarPncp() {
+  if (!requireUnlock()) return;
+  const modal = document.getElementById("modal-pncp");
+  const etapa = document.getElementById("pncp-etapa");
+  const bar = document.getElementById("pncp-bar");
+  const logEl = document.getElementById("pncp-log");
+  const fechar = document.getElementById("pncp-fechar");
+  const resumo = document.getElementById("pncp-resumo");
+  logEl.textContent = ""; resumo.textContent = ""; bar.style.width = "0"; fechar.disabled = true;
+  modal.classList.add("open");
+  const log = msg => { logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; };
+
+  try {
+    const dataFinal = (() => { const d = new Date(); d.setDate(d.getDate() + 400); return `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`; })();
+    const mods = Object.keys(MODALIDADES).map(Number);
+    const coletados = new Map();
+    const falhas = [];
+    for (let mi = 0; mi < mods.length; mi++) {
+      const mod = mods[mi];
+      let pag = 1, total = 1;
+      while (pag <= total) {
+        etapa.textContent = `${MODALIDADES[mod]}: página ${pag} de ${total}`;
+        bar.style.width = `${Math.round((mi + (pag - 1) / Math.max(total, 1)) / mods.length * 100)}%`;
+        const resp = await buscarPagina(mod, pag, dataFinal, log);
+        if (resp === null) { falhas.push(`${MODALIDADES[mod]} p.${pag}`); log(`  página ${pag} não lida — seguindo`); pag++; continue; }
+        if (resp.totalPaginas) total = resp.totalPaginas;
+        else if (!(resp.data || []).length) break;
+        for (const it of resp.data || []) if (it.numeroControlePNCP && !coletados.has(it.numeroControlePNCP)) coletados.set(it.numeroControlePNCP, it);
+        log(`${MODALIDADES[mod]}: página ${pag}/${total} ok (${coletados.size} licitações abertas lidas)`);
+        pag++;
+        await sleep(1500);
+      }
+    }
+    bar.style.width = "100%";
+    etapa.textContent = "Filtrando e gravando...";
+
+    // filtro + agrupamento de publicações repetidas do mesmo edital
+    const existentes = new Map(licitacoes.map(l => [l.id, l]));
+    const agora = localIso(new Date());
+    const grupos = new Map();
+    const melhor = (a, b) => {
+      if (a.existe !== b.existe) return a.existe;
+      const av = (a.it.valorTotalEstimado || 0) > 0, bv = (b.it.valorTotalEstimado || 0) > 0;
+      if (av !== bv) return av;
+      return (a.it.dataPublicacaoPncp || "") > (b.it.dataPublicacaoPncp || "");
+    };
+    for (const it of coletados.values()) {
+      const c = classificar(it.objetoCompra);
+      if (!c) continue;
+      if (it.dataEncerramentoProposta && it.dataEncerramentoProposta < agora) continue;
+      const id = docId(it);
+      const cand = { it, c, id, existe: existentes.has(id) };
+      const chave = (it.orgaoEntidade?.cnpj || "") + "|" + c.chave;
+      const g = grupos.get(chave);
+      if (!g) grupos.set(chave, { best: cand, n: 1 });
+      else { g.n++; if (melhor(cand, g.best)) g.best = cand; }
+    }
+
+    const lote = new Date().toISOString();
+    const entries = [];
+    const vistos = new Set();
+    let novos = 0;
+    for (const { best, n } of grupos.values()) {
+      const { it, c, id } = best;
+      vistos.add(id);
+      const pncp = montarPncp(it, c, n);
+      const atual = existentes.get(id);
+      if (!atual) {
+        novos++;
+        entries.push({ id, data: {
+          origem: "PNCP", ...camposDoPncp(pncp), pncp, naListaPncp: true, interesse: null, status: "",
+          servicos: servicosIniciais(c), atestados: "", observacao: "", garantiaProposta: "", vencedora: "",
+          camposEditados: [], lote, criadoEm: lote, atualizadoEm: lote
+        }});
+      } else {
+        const upd = { pncp, naListaPncp: true, atualizadoEm: lote };
+        const top = camposDoPncp(pncp);
+        for (const k of Object.keys(top)) if (!(atual.camposEditados || []).includes(k)) upd[k] = top[k];
+        entries.push({ id, data: upd });
+      }
+    }
+    // o que saiu da lista do PNCP (prazo encerrado, suspensa, revogada) fica guardado, mas marcado
+    for (const l of licitacoes) {
+      if (l.origem === "PNCP" && l.naListaPncp !== false && !vistos.has(l.id)) entries.push({ id: l.id, data: { naListaPncp: false, atualizadoEm: lote } });
+    }
+    log(`\nGravando ${entries.length} registros...`);
+    await store.saveMany(entries);
+    meta = { em: lote, totalColetadas: coletados.size, relevantes: grupos.size, novos, falhas };
+    await store.setMeta(meta);
+    licitacoes = await store.loadAll();
+    renderAll();
+    etapa.textContent = "Concluído.";
+    resumo.textContent = `${grupos.size} relevantes · ${novos} novas` + (falhas.length ? ` · ${falhas.length} páginas não lidas` : "");
+    log(`\nPronto: ${coletados.size} licitações abertas em MG, ${grupos.size} de pavimentação/terraplenagem/drenagem, ${novos} novas.`);
+    if (falhas.length) log(`Atenção: páginas não lidas (PNCP bloqueou): ${falhas.join("; ")}. Atualize de novo mais tarde para completar.`);
+  } catch (e) {
+    console.error(e);
+    etapa.textContent = "Erro na atualização.";
+    log("\nERRO: " + (e.message || e));
+    toast(e.message || "Erro ao atualizar do PNCP.", true);
+  } finally {
+    fechar.disabled = false;
+  }
+}
+
+/* ------------------------------ exportar ------------------------------ */
+function exportarExcel() {
+  if (typeof XLSX === "undefined") { toast("Biblioteca do Excel não carregou. Verifique a internet.", true); return; }
+  const list = getFiltered();
+  const rows = list.map(l => ({
+    "INTERESSE": l.interesse === "SIM" ? "SIM" : l.interesse === "NAO" ? "NÃO" : "A DECIDIR",
+    "DATA": fmtDateTime(l.dataSessao),
+    "ÓRGÃO": l.orgao || "",
+    "CIDADE": l.cidade || "",
+    "Nº LICITAÇÃO": l.numero || "",
+    "MODALIDADE": l.modalidade || "",
+    "SERVIÇOS": (l.servicos || []).map(s => `${s.nome}${s.pct != null ? " " + s.pct + "%" : ""}`).join("\n") || servicosDetectados(l).join(", "),
+    "VALOR": l.valor ?? "",
+    "OBJETO": l.objeto || "",
+    "ATESTADOS SOLICITADOS": l.atestados || "",
+    "STATUS": l.status || "",
+    "OBSERVAÇÃO": l.observacao || "",
+    "GARANTIA DE PROPOSTA": l.garantiaProposta || "",
+    "VENCEDORA E DESCONTO FINAL": l.vencedora || "",
+    "LINK PNCP": l.pncp?.linkPncp || "",
+    "LINK PORTAL": l.linkPortal || ""
+  }));
+  const ws = XLSX.utils.json_to_sheet(rows);
+  ws["!cols"] = [10, 16, 28, 20, 22, 20, 30, 16, 60, 40, 22, 35, 22, 22, 40, 40].map(w => ({ wch: w }));
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "CONTROLE DE LICITAÇÕES");
+  const d = new Date();
+  XLSX.writeFile(wb, `CONTROLE_LICITACOES_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.xlsx`);
+}
+
+/* ------------------------------ eventos ------------------------------ */
+function mostrarView(view) {
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === view));
+  document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + view));
+}
+function irPara(go) {
+  const fInt = document.getElementById("f-interesse");
+  const fPrazo = document.getElementById("f-prazo");
+  fPrazo.value = "";
+  if (go === "pendentes") fInt.value = "pendentes";
+  else if (go === "sim") fInt.value = "sim";
+  else if (go === "prazo7") { fInt.value = "ativos"; fPrazo.value = "7"; }
+  renderTabela();
+  mostrarView("controle");
+}
+
+document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => mostrarView(t.dataset.view)));
+document.addEventListener("click", e => {
+  const intBtn = e.target.closest(".int-btn[data-int]");
+  if (intBtn) { setInteresse(intBtn.dataset.id, intBtn.dataset.int); return; }
+  const edit = e.target.closest("[data-edit]");
+  if (edit) { abrirModal(edit.dataset.edit); return; }
+  const go = e.target.closest("[data-go]");
+  if (go) { irPara(go.dataset.go); return; }
+  const more = e.target.closest("[data-more]");
+  if (more) { const c = more.previousElementSibling; c.classList.toggle("open"); more.textContent = c.classList.contains("open") ? "ver menos" : "ver tudo"; return; }
+  if (e.target.closest("[data-close]")) e.target.closest(".modal-backdrop").classList.remove("open");
+});
+["f-busca", "f-interesse", "f-servico", "f-tipo", "f-modalidade", "f-status", "f-prazo"].forEach(id => {
+  document.getElementById(id).addEventListener(id === "f-busca" ? "input" : "change", renderTabela);
+});
+document.querySelectorAll("th.sortable").forEach(th => th.addEventListener("click", () => {
+  const k = th.dataset.sort;
+  if (sortKey === k) sortDir = sortDir === "asc" ? "desc" : "asc";
+  else { sortKey = k; sortDir = k === "valor" ? "desc" : "asc"; }
+  renderTabela();
+}));
+document.getElementById("m-interesse").addEventListener("click", e => {
+  const b = e.target.closest(".int-btn"); if (b) setModalInteresse(b.dataset.val);
+});
+document.getElementById("m-add-serv").addEventListener("click", () => {
+  document.getElementById("m-servicos").insertAdjacentHTML("beforeend", servRowHtml());
+});
+document.getElementById("m-servicos").addEventListener("click", e => {
+  if (e.target.closest(".sv-del")) { e.target.closest(".serv-row").remove(); atualizarSomaServ(); }
+});
+document.getElementById("m-servicos").addEventListener("input", atualizarSomaServ);
+document.getElementById("m-salvar").addEventListener("click", salvarModal);
+document.getElementById("m-excluir").addEventListener("click", excluirAtual);
+document.getElementById("btn-add").addEventListener("click", () => abrirModal(null));
+document.getElementById("btn-pncp").addEventListener("click", atualizarPncp);
+document.getElementById("pncp-fechar").addEventListener("click", () => document.getElementById("modal-pncp").classList.remove("open"));
+document.getElementById("btn-export").addEventListener("click", exportarExcel);
+document.getElementById("btn-print").addEventListener("click", () => { mostrarView("controle"); setTimeout(() => window.print(), 100); });
+
+init();
+</script>
+</body>
+</html>
