@@ -139,7 +139,8 @@
   /* o painel da tabela não pode cortar (overflow), senão a barra flutuante não gruda no rodapé da tela */
   .panel:has(#lic-wrap){overflow:visible;}
   .rolagem-flutuante{border-radius:0 0 var(--radius) var(--radius);}
-  #lic-table tr[data-edit]{cursor:pointer;}
+  #lic-table tr[data-edit], .decide-item[data-edit]{cursor:pointer;}
+  .decide-item[data-edit]:hover{background:var(--card-hover);}
   /* Interesse e Data ficam fixos à esquerda ao rolar para os lados */
   #lic-wrap th:nth-child(1), #lic-wrap td:nth-child(1){position:sticky;left:0;z-index:3;background:var(--card);min-width:132px;width:132px;}
   #lic-wrap th:nth-child(2), #lic-wrap td:nth-child(2){position:sticky;left:132px;z-index:3;background:var(--card);box-shadow:6px 0 8px -6px rgba(0,0,0,.18);}
@@ -1360,7 +1361,7 @@ function renderDashboard() {
   // decidir agora
   const decidir = [...pend].sort((a, b) => (a.dataSessao || "9").localeCompare(b.dataSessao || "9")).slice(0, 10);
   document.getElementById("dash-decidir").innerHTML = decidir.length ? decidir.map(l => `
-    <div class="decide-item">
+    <div class="decide-item" data-edit="${escapeHtml(l.id)}" title="Clique para ver os detalhes">
       <div><div style="font-weight:600;font-size:.76rem;">${fmtDateTime(l.dataSessao).slice(0, 10)}</div>${prazoBadge(l)}</div>
       <div>
         <div class="obj clamp" style="-webkit-line-clamp:2;">${escapeHtml(l.objeto)}</div>
@@ -2477,7 +2478,7 @@ document.addEventListener("click", e => {
   if (atest) { abrirAtestados(atest.dataset.atest); return; }
   const edit = e.target.closest("[data-edit]");
   // linha da tabela clicável: links (PNCP, Alerta, edital...) e texto selecionado não abrem os detalhes
-  if (edit && edit.tagName === "TR" && (e.target.closest("a[href]") || String(window.getSelection()).trim())) return;
+  if (edit && edit.tagName !== "BUTTON" &&(e.target.closest("a[href]") || String(window.getSelection()).trim())) return;
   if (edit) { document.getElementById("modal-atest").classList.remove("open"); abrirModal(edit.dataset.edit); return; }
   const go = e.target.closest("[data-go]");
   if (go) { irPara(go.dataset.go); return; }
