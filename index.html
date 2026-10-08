@@ -371,8 +371,8 @@
                 <th class="sortable" data-sort="valor">Valor</th>
                 <th>Objeto</th>
                 <th>Atestados solicitados</th>
-                <th>Observação</th>
                 <th>Garantia de proposta</th>
+                <th>Observação</th>
                 <th>Vencedora e desconto final</th>
                 <th class="no-print"></th>
               </tr>
@@ -447,14 +447,14 @@
           <textarea id="m-atestados" rows="4" placeholder="Pavimentação asfáltica - CBUQ - 219,50 m³&#10;Drenagem pluvial - 48,50 m"></textarea>
         </div>
         <div class="field full">
-          <label>Observação</label>
-          <textarea id="m-obs" rows="3" placeholder="Modo de disputa, inversão de fases, impugnação, revisão enviada..."></textarea>
-        </div>
-        <div class="field">
           <label>Garantia de proposta</label>
           <input type="text" id="m-garantia" placeholder="Ex: SIM - R$ 47.590,60 / NÃO">
         </div>
-        <div class="field">
+        <div class="field full">
+          <label>Observação</label>
+          <textarea id="m-obs" rows="3" placeholder="Modo de disputa, inversão de fases, impugnação, revisão enviada..."></textarea>
+        </div>
+        <div class="field full">
           <label>Vencedora e desconto final</label>
           <input type="text" id="m-vencedora" placeholder="Ex: LM - 20,66%">
         </div>
@@ -1184,8 +1184,8 @@ function renderTabela() {
       <td class="col-objeto"><div class="clamp">${escapeHtml(l.objeto)}</div>${(l.objeto || "").length > 260 ? `<span class="more" data-more>ver tudo</span>` : ""}
         ${objetoBadges(l)}</td>
       <td class="col-atest">${atestadoCelula(l)}</td>
-      <td class="col-obs">${escapeHtml(l.observacao)}</td>
       <td>${escapeHtml(l.garantiaProposta)}</td>
+      <td class="col-obs">${escapeHtml(l.observacao)}</td>
       <td>${escapeHtml(l.vencedora)}</td>
       <td class="no-print"><div class="row-actions">
         <button class="icon-btn" data-edit="${escapeHtml(l.id)}" title="Editar / preencher">Editar</button>
@@ -1677,8 +1677,8 @@ function exportarExcel() {
     "OBJETO": l.objeto || "",
     "ATESTADOS SOLICITADOS": l.atestados || "",
     "RESULTADO": l.status || "",
-    "OBSERVAÇÃO": l.observacao || "",
     "GARANTIA DE PROPOSTA": l.garantiaProposta || "",
+    "OBSERVAÇÃO": l.observacao || "",
     "VENCEDORA E DESCONTO FINAL": l.vencedora || "",
     "LINK PNCP": l.pncp?.linkPncp || "",
     "LINK ALERTA": l.alerta?.link || "",
