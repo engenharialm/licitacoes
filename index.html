@@ -294,6 +294,7 @@
   <nav class="tabs">
     <button class="tab active" data-view="dashboard">Dashboard</button>
     <button class="tab" data-view="controle">Controle de licitações <span class="count" id="tab-count-controle">0</span></button>
+    <button class="tab" data-view="ganhas">Ganhas pela LM <span class="count" id="tab-count-ganhas">0</span></button>
   </nav>
 
   <main>
@@ -334,6 +335,62 @@
         <div class="panel">
           <div class="panel-head">Cidades com maior valor em aberto</div>
           <div class="panel-body" id="dash-cidades"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- GANHAS PELA LM -->
+    <section class="view" id="view-ganhas">
+      <div class="cards-row" id="gan-cards"></div>
+
+      <div class="dash-grid">
+        <div class="panel">
+          <div class="panel-head">Próximos prazos <small>processos em acompanhamento</small></div>
+          <div class="panel-body" id="gan-prazos"></div>
+        </div>
+        <div class="panel">
+          <div class="panel-head">Distribuição do valor ganho</div>
+          <div class="panel-body" id="gan-distrib"></div>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-head">Contratos ganhos <small id="gan-total-ganhos"></small>
+          <button class="btn btn-ghost btn-sm" id="gan-add" type="button">+ Adicionar à carteira</button>
+        </div>
+        <div class="table-wrap" style="max-height:none;">
+          <table>
+            <thead><tr>
+              <th>Contrato</th><th>Cliente / órgão</th><th>Referência</th><th>Valor ganho</th><th>Desconto</th><th>Contrato no PNCP</th><th class="no-print"></th>
+            </tr></thead>
+            <tbody id="gan-ganhos"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-head">Processos em acompanhamento <small id="gan-total-acomp"></small></div>
+        <div class="table-wrap" style="max-height:none;">
+          <table>
+            <thead><tr>
+              <th>Local</th><th>Fase</th><th>Valor (R$)</th><th>Desc. LM</th><th>Vencedora</th><th>Pos.</th><th>Situação informada</th><th>Próximo prazo</th><th class="no-print"></th>
+            </tr></thead>
+            <tbody id="gan-acomp"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-head">Contratos da LM publicados no PNCP <small id="gan-pncp-info">CNPJ 32.109.890/0001-60</small>
+          <select id="gan-ano" class="btn-sm" style="border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-family:inherit;"></select>
+        </div>
+        <div class="table-wrap" style="max-height:none;">
+          <table>
+            <thead><tr>
+              <th>Assinatura</th><th>Órgão</th><th>Município</th><th>Contrato</th><th>Objeto</th><th>Valor</th><th>Na carteira?</th><th class="no-print"></th>
+            </tr></thead>
+            <tbody id="gan-pncp"></tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -525,6 +582,80 @@
 </div>
 <datalist id="dl-municipios"></datalist>
 
+<!-- MODAL: item da carteira (ganhas) -->
+<div class="modal-backdrop" id="modal-gan">
+  <div class="modal" style="max-width:640px;">
+    <div class="modal-head">
+      <h2 id="gan-m-titulo">Carteira da LM</h2>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field">
+          <label>Situação</label>
+          <select id="gan-m-situacao">
+            <option value="GANHO">Contrato ganho</option>
+            <option value="ANALISE">Ganho em análise</option>
+            <option value="ANDAMENTO">Em andamento</option>
+            <option value="PERDIDO">Perdido / encerrado</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Local / contrato *</label>
+          <input type="text" id="gan-m-local" placeholder="Ex: Felixlândia, via rural">
+        </div>
+        <div class="field full">
+          <label>Cliente / órgão</label>
+          <input type="text" id="gan-m-cliente" placeholder="Ex: Prefeitura de Felixlândia, DER-MG, VINCI">
+        </div>
+        <div class="field">
+          <label>Valor de referência (R$)</label>
+          <input type="number" id="gan-m-ref" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label>Valor ganho / proposta LM (R$)</label>
+          <input type="number" id="gan-m-valor" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label>Desconto LM (%)</label>
+          <input type="number" id="gan-m-desc" step="0.01">
+        </div>
+        <div class="field">
+          <label>Desconto da vencedora (%)</label>
+          <input type="number" id="gan-m-desc-venc" step="0.01">
+        </div>
+        <div class="field">
+          <label>Posição da LM</label>
+          <input type="text" id="gan-m-pos" placeholder="Ex: 2º">
+        </div>
+        <div class="field">
+          <label>Próximo prazo</label>
+          <input type="datetime-local" id="gan-m-prazo">
+        </div>
+        <div class="field full">
+          <label>Etapa do próximo prazo</label>
+          <input type="text" id="gan-m-etapa" placeholder="Ex: Intenção de recurso, Habilitação, Contrarrecurso">
+        </div>
+        <div class="field full">
+          <label>Situação informada</label>
+          <textarea id="gan-m-obs" rows="2"></textarea>
+        </div>
+        <div class="field full">
+          <label>Link (contrato no PNCP, processo, portal)</label>
+          <input type="text" id="gan-m-link" placeholder="https://...">
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger-ghost btn-sm" id="gan-m-excluir" style="visibility:hidden;">Excluir</button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" data-close>Cancelar</button>
+        <button class="btn btn-accent" id="gan-m-salvar">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL: documentos da licitação -->
 <div class="modal-backdrop" id="modal-docs">
   <div class="modal" style="max-width:680px;">
@@ -685,6 +816,35 @@ const store = {
   async setMeta(m, nome = "pncp") {
     if (useFirebase) return withTimeout(() => fs.setDoc(fs.doc(db, META_COL, nome), m));
     localStorage.setItem(LS_META + (nome === "pncp" ? "" : "_" + nome), JSON.stringify(m));
+  }
+};
+
+// carteira de contratos ganhos e processos em acompanhamento (aba "Ganhas pela LM")
+const COL_GANHAS = "licitacoes_ganhas";
+const LS_GANHAS = "licitacoesLM_ganhas";
+const storeGanhas = {
+  async loadAll() {
+    if (useFirebase) {
+      return withTimeout(async () => (await fs.getDocs(fs.collection(db, COL_GANHAS))).docs.map(d => ({ id: d.id, ...d.data() })));
+    }
+    try { return JSON.parse(localStorage.getItem(LS_GANHAS)) || []; } catch { return []; }
+  },
+  async save(id, data) {
+    if (useFirebase) {
+      if (id) { await withTimeout(() => fs.setDoc(fs.doc(db, COL_GANHAS, id), data, { merge: true })); return id; }
+      const ref = await withTimeout(() => fs.addDoc(fs.collection(db, COL_GANHAS), data));
+      return ref.id;
+    }
+    const lista = await this.loadAll();
+    const novoId = id || "local-" + Date.now() + "-" + Math.random().toString(36).slice(2);
+    const i = lista.findIndex(g => g.id === novoId);
+    if (i >= 0) lista[i] = { ...lista[i], ...data }; else lista.push({ id: novoId, ...data });
+    localStorage.setItem(LS_GANHAS, JSON.stringify(lista));
+    return novoId;
+  },
+  async remove(id) {
+    if (useFirebase) return withTimeout(() => fs.deleteDoc(fs.doc(db, COL_GANHAS, id)));
+    localStorage.setItem(LS_GANHAS, JSON.stringify((await this.loadAll()).filter(g => g.id !== id)));
   }
 };
 
@@ -986,7 +1146,7 @@ let sortDir = "asc";
 async function init() {
   try {
     let metaRegioes;
-    [licitacoes, meta, metaAlerta, metaRegioes] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta"), store.getMeta("regioes"), carregarMunicipios()]);
+    [licitacoes, meta, metaAlerta, metaRegioes, ganhas] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta"), store.getMeta("regioes"), storeGanhas.loadAll(), carregarMunicipios()]);
     if (metaRegioes && Array.isArray(metaRegioes.lista) && metaRegioes.lista.length) regioes = metaRegioes.lista;
     setConnStatus(true);
   } catch (e) {
@@ -1013,6 +1173,7 @@ function renderAll() {
   renderFilters();
   renderDashboard();
   renderTabela();
+  renderGanhas();
 }
 
 function renderUpdateLine() {
@@ -1926,6 +2087,205 @@ function exportarExcel() {
 function mostrarView(view) {
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.view === view));
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === "view-" + view));
+  // faixa de regiões e aviso do PNCP só valem para as licitações abertas
+  document.querySelector(".regiao-bar").style.display = view === "ganhas" ? "none" : "";
+  document.getElementById("update-line").style.display = view === "ganhas" ? "none" : "";
+  if (view === "ganhas" && contratosPncp === null) carregarContratosLm();
+}
+
+/* ------------------------------ ganhas pela LM ------------------------------ */
+const LM_CNPJ = "32109890000160";
+const FASES_GAN = { GANHO: "Contrato ganho", ANALISE: "Ganho em análise", ANDAMENTO: "Em andamento", PERDIDO: "Perdido / encerrado" };
+let ganhas = [];
+let contratosPncp = null;     // null = ainda não buscado; [] = buscado
+let ganEditId = null;
+
+function pct(v) { return v === null || v === undefined || v === "" || isNaN(Number(v)) ? "—" : Number(v).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) + "%"; }
+// contrato do PNCP com o mesmo valor do item da carteira (o valor contratado é praticamente único)
+function contratoDoItem(g) {
+  if (!contratosPncp || !(g.valor > 0)) return null;
+  return contratosPncp.find(c => Math.abs((Number(c.valor_global) || 0) - g.valor) < 1) || null;
+}
+function itemDoContrato(c) {
+  return ganhas.find(g => g.valor > 0 && Math.abs((Number(c.valor_global) || 0) - g.valor) < 1) || null;
+}
+function linkContrato(c) { return "https://pncp.gov.br/app" + (c.item_url || ""); }
+// alguns órgãos publicam no PNCP com acentuação quebrada ("ContrataÃ§Ã£o"); desfaz quando for o caso
+function corrigirAcentos(s) {
+  if (!/Ã|Â/.test(s || "")) return s || "";
+  try { return decodeURIComponent(escape(s)); } catch { return s; }
+}
+
+function renderGanhas() {
+  const ganhos = ganhas.filter(g => g.situacao === "GANHO").sort((a, b) => (b.valor || 0) - (a.valor || 0));
+  const analise = ganhas.filter(g => g.situacao === "ANALISE");
+  const andamento = ganhas.filter(g => g.situacao === "ANDAMENTO");
+  const soma = (lista, f) => lista.reduce((s, g) => s + (Number(f(g)) || 0), 0);
+  // desconto ponderado: só contratos com referência conhecida
+  const comRef = ganhos.filter(g => g.referencia > 0 && g.valor > 0);
+  const descPond = comRef.length ? (1 - soma(comRef, g => g.valor) / soma(comRef, g => g.referencia)) * 100 : null;
+  const anoAtual = String(new Date().getFullYear());
+  const foraDaCarteira = (contratosPncp || []).filter(c => String(c.ano) === anoAtual && !itemDoContrato(c));
+  document.getElementById("tab-count-ganhas").textContent = ganhos.length;
+
+  const cards = [
+    { label: "Valor ganho", value: fmtMoneyCurto(soma(ganhos, g => g.valor)), cls: "lime", sub: `${ganhos.length} contratos` },
+    { label: "Ganho em análise", value: fmtMoneyCurto(soma(analise, g => g.valor || g.referencia)), cls: "accent", sub: `${analise.length} processos` },
+    { label: "Em andamento", value: fmtMoneyCurto(soma(andamento, g => g.referencia || g.valor)), cls: "", sub: `referência de ${andamento.length} processos` },
+    { label: "Desconto dos ganhos", value: descPond === null ? "—" : pct(descPond), cls: "", sub: `ponderado sobre ${comRef.length} contratos` },
+    { label: `PNCP ${anoAtual} fora da carteira`, value: contratosPncp === null ? "…" : foraDaCarteira.length, cls: foraDaCarteira.length ? "warn" : "", sub: "contratos da LM a conferir" }
+  ];
+  document.getElementById("gan-cards").innerHTML = cards.map(c => `
+    <div class="card"><div class="label">${c.label}</div><div class="value ${c.cls}">${c.value}</div><div class="sub">${c.sub}</div></div>`).join("");
+
+  const prazos = [...analise, ...andamento].filter(g => g.prazo).sort((a, b) => a.prazo.localeCompare(b.prazo));
+  document.getElementById("gan-prazos").innerHTML = prazos.length ? `<table><tbody>${prazos.map(g => `
+    <tr data-gan-edit="${escapeHtml(g.id)}" style="cursor:pointer;">
+      <td class="nowrap"><b>${fmtDateTime(g.prazo)}</b><div>${prazoBadge({ dataSessao: g.prazo })}</div></td>
+      <td><b>${escapeHtml(g.local)}</b><div class="muted small">${escapeHtml(g.etapa || "")}</div></td>
+    </tr>`).join("")}</tbody></table>` : `<div class="empty-state" style="padding:20px;">Sem prazos cadastrados.</div>`;
+
+  const top = ganhos.slice(0, 3).map(g => [g.local, g.valor]);
+  const demais = soma(ganhos.slice(3), g => g.valor);
+  barras("gan-distrib", demais > 0 ? [...top, ["Demais contratos", demais]] : top, fmtMoneyCurto);
+
+  document.getElementById("gan-total-ganhos").textContent = `${fmtMoney(soma(ganhos, g => g.valor))} · referência ${fmtMoney(soma(comRef, g => g.referencia))}`;
+  document.getElementById("gan-ganhos").innerHTML = ganhos.length ? ganhos.map(g => {
+    const c = contratoDoItem(g);
+    return `<tr>
+      <td><b>${escapeHtml(g.local)}</b></td>
+      <td>${escapeHtml(g.cliente || "")}</td>
+      <td class="nowrap">${g.referencia > 0 ? fmtMoney(g.referencia) : `<span class="muted">não informada</span>`}</td>
+      <td class="nowrap"><b>${fmtMoney(g.valor)}</b></td>
+      <td>${pct(g.desconto)}</td>
+      <td>${c ? `<a class="icon-btn" href="${escapeHtml(linkContrato(c))}" target="_blank" rel="noopener" title="${escapeHtml(corrigirAcentos(c.description))}">${escapeHtml(c.title || "Contrato")} · ${fmtDateTime((c.data_assinatura || "").slice(0, 10))}</a>`
+          : safeUrl(g.link) ? `<a class="icon-btn" href="${escapeHtml(g.link)}" target="_blank" rel="noopener">Abrir link</a>` : `<span class="muted small">${contratosPncp === null ? "buscando…" : "não localizado no PNCP"}</span>`}</td>
+      <td class="no-print"><button class="icon-btn" data-gan-edit="${escapeHtml(g.id)}">Editar</button></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="7"><div class="empty-state">Nenhum contrato ganho cadastrado.</div></td></tr>`;
+
+  const acomp = [...analise, ...andamento];
+  document.getElementById("gan-total-acomp").textContent = `ganho em análise ${fmtMoney(soma(analise, g => g.valor || g.referencia))} · em andamento ${fmtMoney(soma(andamento, g => g.referencia || g.valor))}`;
+  document.getElementById("gan-acomp").innerHTML = acomp.length ? acomp.map(g => `<tr>
+      <td><b>${escapeHtml(g.local)}</b>${g.cliente ? `<div class="muted small">${escapeHtml(g.cliente)}</div>` : ""}</td>
+      <td><span class="badge ${g.situacao === "ANALISE" ? "lime" : "accent"}">${FASES_GAN[g.situacao]}</span></td>
+      <td class="nowrap">${fmtMoney(g.referencia || g.valor)}</td>
+      <td>${pct(g.desconto)}</td>
+      <td>${pct(g.descontoVencedora)}</td>
+      <td>${escapeHtml(g.posicao || "—")}</td>
+      <td class="col-obs">${escapeHtml(g.obs || "")}</td>
+      <td class="nowrap">${g.prazo ? `<b>${fmtDateTime(g.prazo)}</b><div class="muted small">${escapeHtml(g.etapa || "")}</div>` : "—"}</td>
+      <td class="no-print"><button class="icon-btn" data-gan-edit="${escapeHtml(g.id)}">Editar</button></td>
+    </tr>`).join("") : `<tr><td colspan="9"><div class="empty-state">Nenhum processo em acompanhamento.</div></td></tr>`;
+
+  renderContratosPncp();
+}
+
+function renderContratosPncp() {
+  const tbody = document.getElementById("gan-pncp");
+  if (contratosPncp === null) { tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">Buscando os contratos da LM no PNCP…</div></td></tr>`; return; }
+  const sel = document.getElementById("gan-ano");
+  const anos = [...new Set(contratosPncp.map(c => String(c.ano)))].sort().reverse();
+  const atual = sel.value || String(new Date().getFullYear());
+  sel.innerHTML = anos.map(a => `<option value="${a}">${a}</option>`).join("") + `<option value="">Todos os anos</option>`;
+  sel.value = anos.includes(atual) || atual === "" ? atual : anos[0] || "";
+  const lista = contratosPncp.filter(c => !sel.value || String(c.ano) === sel.value);
+  document.getElementById("gan-pncp-info").textContent = `CNPJ 32.109.890/0001-60 · ${lista.length} contrato(s) · ${fmtMoney(lista.reduce((s, c) => s + (Number(c.valor_global) || 0), 0))}`;
+  tbody.innerHTML = lista.length ? lista.map((c, i) => {
+    const item = itemDoContrato(c);
+    return `<tr>
+      <td class="nowrap">${fmtDateTime((c.data_assinatura || c.data_publicacao_pncp || "").slice(0, 10))}</td>
+      <td>${escapeHtml(c.orgao_nome || "")}</td>
+      <td>${escapeHtml(c.municipio_nome || "")}/${escapeHtml(c.uf || "")}</td>
+      <td class="nowrap">${escapeHtml(c.title || "")}</td>
+      <td class="col-objeto"><div class="clamp" style="-webkit-line-clamp:3;">${escapeHtml(corrigirAcentos(c.description))}</div></td>
+      <td class="nowrap"><b>${fmtMoney(c.valor_global)}</b></td>
+      <td>${item ? `<span class="badge lime">sim — ${escapeHtml(item.local)}</span>` : `<span class="badge warn">não está na carteira</span>`}</td>
+      <td class="no-print"><div class="row-actions">
+        <a class="icon-btn" href="${escapeHtml(linkContrato(c))}" target="_blank" rel="noopener">PNCP</a>
+        ${item ? "" : `<button class="icon-btn" data-gan-pncp="${contratosPncp.indexOf(c)}">Adicionar à carteira</button>`}
+      </div></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="8"><div class="empty-state">Nenhum contrato da LM no PNCP neste ano.</div></td></tr>`;
+}
+
+// busca no PNCP os contratos em que a LM é a contratada (pelo CNPJ)
+async function carregarContratosLm() {
+  const todos = [];
+  try {
+    for (let pag = 1; pag <= 10; pag++) {
+      const r = await fetch(`https://pncp.gov.br/api/search/?q=${LM_CNPJ}&tipos_documento=contrato&ordenacao=-data&pagina=${pag}&tam_pagina=50&status=todos`);
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const j = await r.json();
+      const itens = j.items || [];
+      todos.push(...itens);
+      if (itens.length < 50) break;
+    }
+    contratosPncp = todos.filter(c => String(c.fornecedor_ni || "").replace(/\D/g, "") === LM_CNPJ && !c.cancelado)
+      .sort((a, b) => (b.data_assinatura || "").localeCompare(a.data_assinatura || ""));
+  } catch (e) {
+    contratosPncp = [];
+    toast("Não foi possível buscar os contratos no PNCP agora: " + e.message, true);
+  }
+  renderGanhas();
+}
+
+function abrirGanho(id, prefill) {
+  ganEditId = id || null;
+  const g = id ? ganhas.find(x => x.id === id) : (prefill || { situacao: "GANHO" });
+  document.getElementById("gan-m-titulo").textContent = id ? "Editar item da carteira" : "Adicionar à carteira";
+  document.getElementById("gan-m-situacao").value = g.situacao || "GANHO";
+  document.getElementById("gan-m-local").value = g.local || "";
+  document.getElementById("gan-m-cliente").value = g.cliente || "";
+  document.getElementById("gan-m-ref").value = g.referencia ?? "";
+  document.getElementById("gan-m-valor").value = g.valor ?? "";
+  document.getElementById("gan-m-desc").value = g.desconto ?? "";
+  document.getElementById("gan-m-desc-venc").value = g.descontoVencedora ?? "";
+  document.getElementById("gan-m-pos").value = g.posicao || "";
+  document.getElementById("gan-m-prazo").value = (g.prazo || "").slice(0, 16);
+  document.getElementById("gan-m-etapa").value = g.etapa || "";
+  document.getElementById("gan-m-obs").value = g.obs || "";
+  document.getElementById("gan-m-link").value = g.link || "";
+  document.getElementById("gan-m-excluir").style.visibility = id ? "visible" : "hidden";
+  document.getElementById("modal-gan").classList.add("open");
+}
+async function salvarGanho() {
+  const local = document.getElementById("gan-m-local").value.trim();
+  if (!local) { toast("Preencha o local / contrato.", true); return; }
+  if (!requireUnlock()) return;
+  const num = id => { const v = document.getElementById(id).value; return v === "" ? null : Number(v); };
+  const prazo = document.getElementById("gan-m-prazo").value;
+  const ref = num("gan-m-ref"), valor = num("gan-m-valor");
+  let desconto = num("gan-m-desc");
+  // calcula o desconto quando há referência e valor ganho e o campo ficou vazio
+  if (desconto === null && ref > 0 && valor > 0) desconto = Math.round((1 - valor / ref) * 10000) / 100;
+  const dados = {
+    situacao: document.getElementById("gan-m-situacao").value, local,
+    cliente: document.getElementById("gan-m-cliente").value.trim(),
+    referencia: ref, valor, desconto, descontoVencedora: num("gan-m-desc-venc"),
+    posicao: document.getElementById("gan-m-pos").value.trim(),
+    prazo: prazo ? prazo + ":00" : "", etapa: document.getElementById("gan-m-etapa").value.trim(),
+    obs: document.getElementById("gan-m-obs").value.trim(),
+    link: document.getElementById("gan-m-link").value.trim(),
+    atualizadoEm: new Date().toISOString()
+  };
+  try {
+    const id = await storeGanhas.save(ganEditId, dados);
+    const i = ganhas.findIndex(g => g.id === id);
+    if (i >= 0) ganhas[i] = { ...ganhas[i], ...dados }; else ganhas.push({ id, ...dados });
+    document.getElementById("modal-gan").classList.remove("open");
+    renderGanhas();
+    toast("Carteira atualizada.");
+  } catch (e) { toast(e.message || "Erro ao salvar.", true); }
+}
+async function excluirGanho() {
+  if (!ganEditId || !confirm("Excluir este item da carteira?") || !requireUnlock()) return;
+  try {
+    await storeGanhas.remove(ganEditId);
+    ganhas = ganhas.filter(g => g.id !== ganEditId);
+    document.getElementById("modal-gan").classList.remove("open");
+    renderGanhas();
+  } catch (e) { toast(e.message || "Erro ao excluir.", true); }
 }
 function irPara(go) {
   const fInt = document.getElementById("f-interesse");
@@ -1942,6 +2302,15 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
 document.addEventListener("click", e => {
   const intBtn = e.target.closest(".int-btn[data-int]");
   if (intBtn) { setInteresse(intBtn.dataset.id, intBtn.dataset.int); return; }
+  const ganEdit = e.target.closest("[data-gan-edit]");
+  if (ganEdit) { abrirGanho(ganEdit.dataset.ganEdit); return; }
+  const ganPncp = e.target.closest("[data-gan-pncp]");
+  if (ganPncp) {
+    const c = contratosPncp[Number(ganPncp.dataset.ganPncp)];
+    abrirGanho(null, { situacao: "GANHO", local: c.municipio_nome || "", cliente: c.orgao_nome || "", valor: Number(c.valor_global) || null,
+      obs: `${c.title || ""} — assinado em ${fmtDateTime((c.data_assinatura || "").slice(0, 10))}`, link: linkContrato(c) });
+    return;
+  }
   const docs = e.target.closest("[data-docs]");
   if (docs) { abrirDocumentos(docs.dataset.docs); return; }
   const docDel = e.target.closest("[data-doc-del]");
@@ -1990,6 +2359,10 @@ document.getElementById("btn-so-regiao").addEventListener("click", () => {
 try { soRegiao = localStorage.getItem("licSoRegiao") === "1"; } catch {}
 document.getElementById("btn-regioes").addEventListener("click", abrirRegioes);
 document.getElementById("doc-add-btn").addEventListener("click", adicionarDocumento);
+document.getElementById("gan-add").addEventListener("click", () => abrirGanho(null));
+document.getElementById("gan-m-salvar").addEventListener("click", salvarGanho);
+document.getElementById("gan-m-excluir").addEventListener("click", excluirGanho);
+document.getElementById("gan-ano").addEventListener("change", renderContratosPncp);
 document.getElementById("reg-add").addEventListener("click", () => document.getElementById("reg-linhas").insertAdjacentHTML("beforeend", regLinhaHtml()));
 document.getElementById("reg-linhas").addEventListener("click", e => { if (e.target.closest(".rg-del")) e.target.closest(".reg-row").remove(); });
 document.getElementById("reg-salvar").addEventListener("click", salvarRegioes);
