@@ -830,7 +830,7 @@ function renderRegiaoBar() {
   const btn = document.getElementById("btn-so-regiao");
   btn.classList.toggle("on", soRegiao);
   btn.textContent = soRegiao ? "✓ Só regiões de interesse" : "Só regiões de interesse";
-  const ativas = licitacoes.filter(l => isPendente(l) || isSim(l));
+  const ativas = licitacoes.filter(l => visivel(l) && (isPendente(l) || isSim(l)));
   const dentro = ativas.filter(l => { const r = regiaoDe(l); return r && r.dentro; }).length;
   const indef = ativas.filter(l => !regiaoDe(l)).length;
   document.getElementById("regiao-resumo").textContent =
@@ -880,6 +880,9 @@ async function salvarRegioes() {
     toast("Regiões de interesse salvas.");
   } catch (e) { toast(e.message || "Erro ao salvar regiões.", true); }
 }
+
+// a LM não faz calçamento: o que o edital confirmou como calçamento fica guardado, mas não aparece
+function visivel(l) { return l.tipoPavimentoEdital !== "calcamento"; }
 
 function isPendente(l) { return !l.interesse && isAtiva(l); }
 function isSim(l) { return l.interesse === "SIM"; }
@@ -972,7 +975,7 @@ function prazoBadge(l) {
 
 function renderDashboard() {
   // o dashboard respeita o filtro de região escolhido na aba de controle
-  const base = licitacoes.filter(passaRegiao);
+  const base = licitacoes.filter(l => visivel(l) && passaRegiao(l));
   const pend = base.filter(isPendente);
   const sim = base.filter(isSim);
   const simAndamento = sim.filter(l => !STATUS_FINAIS.includes(l.status));
@@ -1022,7 +1025,7 @@ function renderDashboard() {
 
   const contar = (lista, fn) => { const m = new Map(); for (const l of lista) for (const k of [].concat(fn(l))) if (k) m.set(k, (m.get(k) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
   const abertas = base.filter(l => isPendente(l) || (isSim(l) && isAtiva(l)));
-  const nomesPavimento = { asfaltico: "Asfáltico", calcamento: "Calçamento (fora do perfil)", misto: "Asfalto + calçamento", nao_identificado: "Não é obra de pavimentação" };
+  const nomesPavimento = { asfaltico: "Asfáltico", misto: "Asfalto + calçamento", nao_identificado: "Não é obra de pavimentação" };
   barras("dash-pavimento", contar(abertas, l => nomesPavimento[l.tipoPavimentoEdital] || "Edital ainda não conferido"));
   barras("dash-servico", contar(abertas, l => automatica(l) ? servicosDetectados(l) : (l.servicos || []).map(s => s.nome)).slice(0, 8));
   barras("dash-modalidade", contar(abertas, l => l.modalidade || "Não informada").slice(0, 8));
@@ -1051,6 +1054,7 @@ function getFiltered() {
   const fPrazo = Number(document.getElementById("f-prazo").value) || 0;
 
   const list = licitacoes.filter(l => {
+    if (!visivel(l)) return false;
     if (fInt === "ativos" && !(isPendente(l) || isSim(l) || (!automatica(l) && l.interesse !== "NAO"))) return false;
     if (fInt === "pendentes" && !isPendente(l)) return false;
     if (fInt === "sim" && !isSim(l)) return false;
@@ -1143,8 +1147,7 @@ function objetoBadges(l) {
   const b = [];
   if (p.tipo && p.tipo !== "Obra") b.push(`<span class="badge info">${escapeHtml(p.tipo)}</span>`);
   // o tipo confirmado no edital vale mais que a leitura do objeto
-  if (l.tipoPavimentoEdital === "calcamento") b.push(`<span class="badge danger">edital de calçamento — não asfáltico</span>`);
-  else if (l.tipoPavimentoEdital === "misto") b.push(`<span class="badge warn">asfalto + calçamento</span>`);
+  if (l.tipoPavimentoEdital === "misto") b.push(`<span class="badge warn">asfalto + calçamento</span>`);
   else if (l.tipoPavimentoEdital !== "asfaltico" && p.asfalto === false) b.push(`<span class="badge warn" title="O objeto não diz se é asfáltica — conferir no edital">tipo de pavimento não informado — conferir</span>`);
   return b.length ? `<div class="badges">${b.join("")}</div>` : "";
 }
@@ -1152,7 +1155,7 @@ function objetoBadges(l) {
 function renderTabela() {
   const list = getFiltered();
   document.getElementById("lic-count").textContent = `${list.length} licitaç${list.length === 1 ? "ão" : "ões"}`;
-  document.getElementById("tab-count-controle").textContent = licitacoes.filter(l => isPendente(l) || isSim(l)).length;
+  document.getElementById("tab-count-controle").textContent = licitacoes.filter(l => visivel(l) && (isPendente(l) || isSim(l))).length;
   const tbody = document.getElementById("lic-table");
   if (!list.length) {
     tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state">${licitacoes.length
