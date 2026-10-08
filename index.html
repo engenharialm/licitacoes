@@ -136,6 +136,8 @@
 
   .col-objeto{min-width:300px;max-width:420px;}
   .col-serv{min-width:200px;}
+  .regiao-bar{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:12px;}
+  #btn-so-regiao.on{background:var(--lime);color:#fff;border-color:var(--lime);}
   .dist{display:inline-block;margin-top:4px;font-size:.66rem;font-weight:700;padding:2px 8px;border-radius:999px;white-space:nowrap;}
   .dist.dentro{background:rgba(77,124,15,.12);color:var(--lime);}
   .dist.fora{background:#E2E8F0;color:var(--text-dim);}
@@ -287,6 +289,10 @@
   </nav>
 
   <main>
+    <div class="regiao-bar no-print">
+      <button class="btn btn-ghost btn-sm" id="btn-so-regiao" title="Mostra só as licitações a até o raio das cidades-base da LM (as sem município definido continuam aparecendo)">Só regiões de interesse</button>
+      <span class="muted small" id="regiao-resumo"></span>
+    </div>
     <div class="update-line" id="update-line"></div>
 
     <!-- DASHBOARD -->
@@ -335,11 +341,6 @@
             <option value="sim">Só interesse SIM</option>
             <option value="nao">Só interesse NÃO</option>
             <option value="todos">Todas</option>
-          </select>
-          <select id="f-regiao" title="Distância em linha reta até as cidades-base da LM">
-            <option value="dentro">Só regiões de interesse</option>
-            <option value="fora">Fora das regiões</option>
-            <option value="">Todas as regiões</option>
           </select>
           <select id="f-servico">
             <option value="">Todos os serviços</option>
@@ -758,7 +759,16 @@ function isAtiva(l) {
 /* ------------------------------ regiões de interesse ------------------------------ */
 const REGIOES_PADRAO = [
   { ibge: "3168606", cidade: "Teófilo Otoni", raio: 100 },
-  { ibge: "3106200", cidade: "Belo Horizonte", raio: 200 }
+  { ibge: "3167202", cidade: "Sete Lagoas", raio: 100 },
+  { ibge: "3168101", cidade: "Tapira", raio: 100 },
+  { ibge: "3125705", cidade: "Felixlândia", raio: 100 },
+  { ibge: "3135209", cidade: "Januária", raio: 100 },
+  { ibge: "3142007", cidade: "Mirabela", raio: 100 },
+  { ibge: "3157906", cidade: "Santa Margarida", raio: 100 },
+  { ibge: "3118601", cidade: "Contagem", raio: 100 },
+  { ibge: "3118304", cidade: "Conselheiro Lafaiete", raio: 100 },
+  { ibge: "3138203", cidade: "Lavras", raio: 100 },
+  { ibge: "3113701", cidade: "Carlos Chagas", raio: 100 }
 ];
 let municipios = {};          // ibge -> [nome, lat, lon]
 let municipioPorNome = {};    // nome normalizado -> ibge
@@ -810,12 +820,22 @@ function regiaoDe(l) {
   regiaoCache.set(l.id, info);
   return info;
 }
-function passaRegiao(l) {
-  const f = document.getElementById("f-regiao").value;
-  if (!f) return true;
+let soRegiao = false;
+function naRegiao(l) {
   const r = regiaoDe(l);
-  if (f === "dentro") return !r || r.dentro;   // sem local definido continua aparecendo
-  return !!r && !r.dentro;
+  return !r || r.dentro;   // sem município definido continua aparecendo, marcado "local a conferir"
+}
+function passaRegiao(l) { return !soRegiao || naRegiao(l); }
+function renderRegiaoBar() {
+  const btn = document.getElementById("btn-so-regiao");
+  btn.classList.toggle("on", soRegiao);
+  btn.textContent = soRegiao ? "✓ Só regiões de interesse" : "Só regiões de interesse";
+  const ativas = licitacoes.filter(l => isPendente(l) || isSim(l));
+  const dentro = ativas.filter(l => { const r = regiaoDe(l); return r && r.dentro; }).length;
+  const indef = ativas.filter(l => !regiaoDe(l)).length;
+  document.getElementById("regiao-resumo").textContent =
+    `${dentro} de ${ativas.length} licitações (pendentes + SIM) estão a até o raio de: ${regioes.map(r => `${r.cidade} ${r.raio} km`).join(", ")}` +
+    (indef ? ` · ${indef} sem município definido (local a conferir)` : "");
 }
 function regiaoHtml(l) {
   const r = regiaoDe(l);
@@ -897,6 +917,7 @@ function setConnStatus(ok) {
 
 function renderAll() {
   regiaoCache.clear();
+  renderRegiaoBar();
   renderUpdateLine();
   renderFilters();
   renderDashboard();
@@ -1721,7 +1742,12 @@ document.getElementById("btn-pncp").addEventListener("click", atualizarPncp);
 document.getElementById("btn-alerta").addEventListener("click", atualizarAlerta);
 document.getElementById("pncp-fechar").addEventListener("click", () => document.getElementById("modal-pncp").classList.remove("open"));
 document.getElementById("btn-export").addEventListener("click", exportarExcel);
-document.getElementById("f-regiao").addEventListener("change", () => { renderDashboard(); renderTabela(); });
+document.getElementById("btn-so-regiao").addEventListener("click", () => {
+  soRegiao = !soRegiao;
+  try { localStorage.setItem("licSoRegiao", soRegiao ? "1" : ""); } catch {}
+  renderRegiaoBar(); renderDashboard(); renderTabela();
+});
+try { soRegiao = localStorage.getItem("licSoRegiao") === "1"; } catch {}
 document.getElementById("btn-regioes").addEventListener("click", abrirRegioes);
 document.getElementById("reg-add").addEventListener("click", () => document.getElementById("reg-linhas").insertAdjacentHTML("beforeend", regLinhaHtml()));
 document.getElementById("reg-linhas").addEventListener("click", e => { if (e.target.closest(".rg-del")) e.target.closest(".reg-row").remove(); });
