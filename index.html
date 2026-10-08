@@ -139,7 +139,8 @@
   /* o painel da tabela não pode cortar (overflow), senão a barra flutuante não gruda no rodapé da tela */
   .panel:has(#lic-wrap){overflow:visible;}
   .rolagem-flutuante{border-radius:0 0 var(--radius) var(--radius);}
-  #lic-table tr[data-edit], .decide-item[data-edit]{cursor:pointer;}
+  #lic-table tr[data-edit], .decide-item[data-edit], tr[data-gan-edit]{cursor:pointer;}
+  #gan-ganhos tr[data-gan-edit]:hover td, #gan-acomp tr[data-gan-edit]:hover td{background:var(--card-hover);}
   .decide-item[data-edit]:hover{background:var(--card-hover);}
   /* Interesse e Data ficam fixos à esquerda ao rolar para os lados */
   #lic-wrap th:nth-child(1), #lic-wrap td:nth-child(1){position:sticky;left:0;z-index:3;background:var(--card);min-width:132px;width:132px;}
@@ -2308,7 +2309,7 @@ function renderGanhas() {
   document.getElementById("gan-total-ganhos").textContent = `${fmtMoney(soma(ganhos, g => g.valor))} · referência ${fmtMoney(soma(comRef, g => g.referencia))}`;
   document.getElementById("gan-ganhos").innerHTML = ganhos.length ? ganhos.map(g => {
     const c = contratoDoItem(g);
-    return `<tr>
+    return `<tr data-gan-edit="${escapeHtml(g.id)}" title="Clique para ver os detalhes">
       <td><b>${escapeHtml(g.local)}</b></td>
       <td>${escapeHtml(g.cliente || "")}</td>
       <td class="nowrap">${g.referencia > 0 ? fmtMoney(g.referencia) : `<span class="muted">não informada</span>`}</td>
@@ -2322,7 +2323,7 @@ function renderGanhas() {
 
   const acomp = [...analise, ...andamento];
   document.getElementById("gan-total-acomp").textContent = `ganho em análise ${fmtMoney(soma(analise, g => g.valor || g.referencia))} · em andamento ${fmtMoney(soma(andamento, g => g.referencia || g.valor))}`;
-  document.getElementById("gan-acomp").innerHTML = acomp.length ? acomp.map(g => `<tr>
+  document.getElementById("gan-acomp").innerHTML = acomp.length ? acomp.map(g => `<tr data-gan-edit="${escapeHtml(g.id)}" title="Clique para ver os detalhes">
       <td><b>${escapeHtml(g.local)}</b>${g.cliente ? `<div class="muted small">${escapeHtml(g.cliente)}</div>` : ""}</td>
       <td><span class="badge ${g.situacao === "ANALISE" ? "lime" : "accent"}">${FASES_GAN[g.situacao]}</span></td>
       <td class="nowrap">${fmtMoney(g.referencia || g.valor)}</td>
@@ -2462,6 +2463,7 @@ document.addEventListener("click", e => {
   const intBtn = e.target.closest(".int-btn[data-int]");
   if (intBtn) { setInteresse(intBtn.dataset.id, intBtn.dataset.int); return; }
   const ganEdit = e.target.closest("[data-gan-edit]");
+  if (ganEdit && ganEdit.tagName === "TR" && (e.target.closest("a[href]") || String(window.getSelection()).trim())) return;
   if (ganEdit) { abrirGanho(ganEdit.dataset.ganEdit); return; }
   const ganPncp = e.target.closest("[data-gan-pncp]");
   if (ganPncp) {
