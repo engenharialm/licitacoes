@@ -130,6 +130,21 @@
   tbody tr.row-nao{opacity:.55;}
   tbody tr.row-sim td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
   .table-wrap{overflow:auto;max-height:calc(100vh - 230px);}
+  .rolar-lados{display:flex;gap:6px;}
+  .rolar-lados .icon-btn{height:34px;min-width:38px;font-size:.8rem;}
+  /* barra de rolagem lateral que acompanha o rodapé da tela enquanto a tabela está visível */
+  .rolagem-flutuante{position:sticky;bottom:0;overflow-x:auto;overflow-y:hidden;height:16px;background:var(--card);border-top:1px solid var(--border);z-index:5;}
+  .rolagem-flutuante > div{height:1px;}
+  .rolagem-flutuante.oculta{display:none;}
+  /* o painel da tabela não pode cortar (overflow), senão a barra flutuante não gruda no rodapé da tela */
+  .panel:has(#lic-wrap){overflow:visible;}
+  .rolagem-flutuante{border-radius:0 0 var(--radius) var(--radius);}
+  #lic-table tr[data-edit]{cursor:pointer;}
+  /* Interesse e Data ficam fixos à esquerda ao rolar para os lados */
+  #lic-wrap th:nth-child(1), #lic-wrap td:nth-child(1){position:sticky;left:0;z-index:3;background:var(--card);min-width:132px;width:132px;}
+  #lic-wrap th:nth-child(2), #lic-wrap td:nth-child(2){position:sticky;left:132px;z-index:3;background:var(--card);box-shadow:6px 0 8px -6px rgba(0,0,0,.18);}
+  #lic-wrap thead th:nth-child(1), #lic-wrap thead th:nth-child(2){z-index:4;}
+  #lic-wrap tbody tr:hover td:nth-child(1), #lic-wrap tbody tr:hover td:nth-child(2){background:var(--card-hover);}
   .muted{color:var(--text-faint);}
   .small{font-size:.7rem;}
   .nowrap{white-space:nowrap;}
@@ -298,7 +313,9 @@
     .toolbar-count{grid-column:1 / -1;}
 
     /* tabelas viram cartões, com o nome da coluna em cima de cada valor */
-    .table-wrap{max-height:none;overflow:visible;}
+    .table-wrap{max-height:none !important;overflow:visible;}
+    .rolagem-flutuante, .rolar-lados{display:none !important;}
+    #lic-wrap th:nth-child(1), #lic-wrap td:nth-child(1), #lic-wrap th:nth-child(2), #lic-wrap td:nth-child(2){position:static;width:auto;min-width:0;box-shadow:none;background:transparent;}
     .tabela-cards thead{display:none;}
     .tabela-cards, .tabela-cards tbody{display:block;}
     .tabela-cards tr{display:block;position:relative;margin:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);}
@@ -342,7 +359,9 @@
     header .header-actions, .tabs, .toolbar, .no-print, .update-line{display:none !important;}
     header{position:static;}
     main{padding:8px;max-width:none;}
-    .table-wrap{max-height:none;overflow:visible;}
+    .table-wrap{max-height:none !important;overflow:visible;}
+    #btn-menu, .rolar-lados{display:none !important;}
+    #lic-wrap th, #lic-wrap td{position:static !important;box-shadow:none !important;}
     .clamp{-webkit-line-clamp:unset;}
     .panel{border:none;}
     tbody tr{break-inside:avoid;}
@@ -507,8 +526,12 @@
           </select>
           <div class="spacer"></div>
           <span class="toolbar-count" id="lic-count"></span>
+          <div class="rolar-lados" title="Dica: Shift + rodinha do mouse também rola para os lados">
+            <button class="icon-btn" id="rolar-esq" type="button" aria-label="Rolar a tabela para a esquerda">◀</button>
+            <button class="icon-btn" id="rolar-dir" type="button" aria-label="Rolar a tabela para a direita">▶</button>
+          </div>
         </div>
-        <div class="table-wrap">
+        <div class="table-wrap" id="lic-wrap">
           <table class="tabela-cards">
             <thead>
               <tr>
@@ -530,6 +553,7 @@
             <tbody id="lic-table"></tbody>
           </table>
         </div>
+        <div class="rolagem-flutuante no-print" id="lic-rolagem"><div></div></div>
       </div>
     </section>
   </main>
@@ -1647,7 +1671,7 @@ function renderTabela() {
     const linkPncp = safeUrl(p.linkPncp);
     const linkAlerta = safeUrl(l.alerta?.link);
     return `
-    <tr class="${l.interesse === "NAO" ? "row-nao" : l.interesse === "SIM" ? "row-sim" : ""}">
+    <tr class="${l.interesse === "NAO" ? "row-nao" : l.interesse === "SIM" ? "row-sim" : ""}" data-edit="${escapeHtml(l.id)}" title="Clique para ver os detalhes">
       <td>${interesseBotoes(l)}</td>
       <td class="nowrap"><b>${fmtDateTime(l.dataSessao) || "—"}</b><div class="badges">${prazoBadge(l)}${novo ? `<span class="badge nova">NOVA</span>` : ""}</div></td>
       <td>${escapeHtml(l.orgao)}${p.esfera ? `<div class="muted small">${escapeHtml(p.esfera)}</div>` : l.origem === "ALERTA" ? `<div class="muted small">via Alerta Licitação</div>` : !automatica(l) ? `<div class="muted small">privada / manual</div>` : ""}</td>
@@ -1671,7 +1695,38 @@ function renderTabela() {
     </tr>`;
   }).join("");
   rotularTabela(tbody);
+  ajustarRolagem();
 }
+
+/* ---------- rolagem lateral da tabela de licitações (computador) ---------- */
+// a tabela rola dentro da própria caixa; a altura da caixa cabe na janela para a barra dela ficar visível
+function ajustarRolagem() {
+  const wrap = document.getElementById("lic-wrap");
+  const barra = document.getElementById("lic-rolagem");
+  if (!wrap || !barra) return;
+  const topo = document.querySelector("header").offsetHeight;
+  wrap.style.maxHeight = Math.max(320, window.innerHeight - topo - 24) + "px";
+  barra.firstElementChild.style.width = wrap.scrollWidth + "px";
+  barra.classList.toggle("oculta", wrap.scrollWidth <= wrap.clientWidth + 2);
+  barra.scrollLeft = wrap.scrollLeft;
+}
+(() => {
+  const wrap = document.getElementById("lic-wrap");
+  const barra = document.getElementById("lic-rolagem");
+  let sincronizando = false;
+  const espelhar = (de, para) => () => {
+    if (sincronizando) return;
+    sincronizando = true;
+    para.scrollLeft = de.scrollLeft;
+    requestAnimationFrame(() => { sincronizando = false; });
+  };
+  wrap.addEventListener("scroll", espelhar(wrap, barra));
+  barra.addEventListener("scroll", espelhar(barra, wrap));
+  const passo = () => Math.max(300, wrap.clientWidth * 0.6);
+  document.getElementById("rolar-esq").addEventListener("click", () => wrap.scrollBy({ left: -passo(), behavior: "smooth" }));
+  document.getElementById("rolar-dir").addEventListener("click", () => wrap.scrollBy({ left: passo(), behavior: "smooth" }));
+  window.addEventListener("resize", ajustarRolagem);
+})();
 
 // no celular cada linha vira um cartão: copia o nome da coluna para cada célula e marca as vazias
 function rotularTabela(tbody) {
@@ -2190,6 +2245,7 @@ function mostrarView(view) {
   document.querySelector(".regiao-bar").style.display = view === "ganhas" ? "none" : "";
   document.getElementById("update-line").style.display = view === "ganhas" ? "none" : "";
   if (view === "ganhas" && contratosPncp === null) carregarContratosLm();
+  if (view === "controle") ajustarRolagem();
 }
 
 /* ------------------------------ ganhas pela LM ------------------------------ */
@@ -2420,6 +2476,8 @@ document.addEventListener("click", e => {
   const atest = e.target.closest("[data-atest]");
   if (atest) { abrirAtestados(atest.dataset.atest); return; }
   const edit = e.target.closest("[data-edit]");
+  // linha da tabela clicável: links (PNCP, Alerta, edital...) e texto selecionado não abrem os detalhes
+  if (edit && edit.tagName === "TR" && (e.target.closest("a[href]") || String(window.getSelection()).trim())) return;
   if (edit) { document.getElementById("modal-atest").classList.remove("open"); abrirModal(edit.dataset.edit); return; }
   const go = e.target.closest("[data-go]");
   if (go) { irPara(go.dataset.go); return; }
