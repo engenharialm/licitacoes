@@ -419,6 +419,10 @@
 
       <div class="form-grid" style="margin-top:16px;">
         <div class="field full">
+          <label>Quantidade de pavimentação asfáltica (somada da planilha orçamentária)</label>
+          <input type="text" id="m-qtd" placeholder="Ex: CBUQ 1.250 t · 22.700 m² de capa">
+        </div>
+        <div class="field full">
           <label>Atestados solicitados (um por linha)</label>
           <textarea id="m-atestados" rows="4" placeholder="Pavimentação asfáltica - CBUQ - 219,50 m³&#10;Drenagem pluvial - 48,50 m"></textarea>
         </div>
@@ -887,15 +891,28 @@ function getFiltered() {
 
 function servicosHtml(l) {
   const lista = l.servicos || [];
+  const extras = (l.qtdAsfalto ? `<div class="small" style="margin-top:4px;"><b>Asfalto:</b> ${escapeHtml(l.qtdAsfalto)}</div>` : "")
+    + (l.preenchidoAuto ? `<div class="badges"><span class="badge nova" title="${escapeHtml(l.preenchidoAuto)}">preenchido do edital — conferir</span></div>` : "");
   if (lista.length) {
     return lista.map(s => `
       <div class="serv-item">
         <div class="serv-line"><span>${escapeHtml(s.nome)}</span><b>${s.pct !== "" && s.pct != null ? Number(s.pct).toLocaleString("pt-BR") + "%" : ""}</b></div>
         ${s.pct ? `<div class="serv-bar"><i style="width:${Math.min(100, Number(s.pct))}%"></i></div>` : ""}
-      </div>`).join("");
+      </div>`).join("") + extras;
   }
   const det = servicosDetectados(l);
-  return det.length ? `<div class="badges">${det.map(d => `<span class="badge grey">${d}</span>`).join("")}</div><div class="muted small" style="margin-top:4px;">misto — conferir % na planilha</div>` : `<span class="muted">—</span>`;
+  return (det.length ? `<div class="badges">${det.map(d => `<span class="badge grey">${d}</span>`).join("")}</div><div class="muted small" style="margin-top:4px;">${det.length > 1 ? "misto — " : ""}conferir % na planilha</div>` : `<span class="muted">—</span>`) + extras;
+}
+
+function objetoBadges(l) {
+  const p = l.pncp || {};
+  const b = [];
+  if (p.tipo && p.tipo !== "Obra") b.push(`<span class="badge info">${escapeHtml(p.tipo)}</span>`);
+  // o tipo confirmado no edital vale mais que a leitura do objeto
+  if (l.tipoPavimentoEdital === "calcamento") b.push(`<span class="badge danger">edital de calçamento — não asfáltico</span>`);
+  else if (l.tipoPavimentoEdital === "misto") b.push(`<span class="badge warn">asfalto + calçamento</span>`);
+  else if (l.tipoPavimentoEdital !== "asfaltico" && p.asfalto === false) b.push(`<span class="badge warn" title="O objeto não diz se é asfáltica — conferir no edital">tipo de pavimento não informado — conferir</span>`);
+  return b.length ? `<div class="badges">${b.join("")}</div>` : "";
 }
 
 function renderTabela() {
@@ -924,7 +941,7 @@ function renderTabela() {
       <td class="col-serv">${servicosHtml(l)}</td>
       <td class="nowrap">${fmtMoney(l.valor) || `<span class="muted">sigiloso / n/i</span>`}</td>
       <td class="col-objeto"><div class="clamp">${escapeHtml(l.objeto)}</div>${(l.objeto || "").length > 260 ? `<span class="more" data-more>ver tudo</span>` : ""}
-        ${(p.tipo && p.tipo !== "Obra") || p.asfalto === false ? `<div class="badges">${p.tipo && p.tipo !== "Obra" ? `<span class="badge info">${escapeHtml(p.tipo)}</span>` : ""}${p.asfalto === false ? `<span class="badge warn" title="O objeto não diz se é asfáltica — conferir no edital">tipo de pavimento não informado — conferir</span>` : ""}</div>` : ""}</td>
+        ${objetoBadges(l)}</td>
       <td class="col-atest">${escapeHtml(l.atestados) || `<span class="muted">—</span>`}</td>
       <td>${l.status ? `<span class="badge ${statusClasse(l.status)}">${escapeHtml(l.status)}</span>` : `<span class="muted">—</span>`}</td>
       <td class="col-obs">${escapeHtml(l.observacao)}</td>
@@ -992,6 +1009,7 @@ function abrirModal(id) {
   document.getElementById("m-objeto").value = l.objeto || "";
   document.getElementById("m-servicos").innerHTML = (l.servicos && l.servicos.length ? l.servicos : [{}]).map(servRowHtml).join("");
   atualizarSomaServ();
+  document.getElementById("m-qtd").value = l.qtdAsfalto || "";
   document.getElementById("m-atestados").value = l.atestados || "";
   document.getElementById("m-obs").value = l.observacao || "";
   document.getElementById("m-garantia").value = l.garantiaProposta || "";
@@ -1031,6 +1049,7 @@ async function salvarModal() {
       nome: r.querySelector(".sv-nome").value.trim().toUpperCase(),
       pct: r.querySelector(".sv-pct").value === "" ? null : Number(r.querySelector(".sv-pct").value)
     })).filter(s => s.nome),
+    qtdAsfalto: document.getElementById("m-qtd").value.trim(),
     atestados: document.getElementById("m-atestados").value.trim(),
     observacao: document.getElementById("m-obs").value.trim(),
     garantiaProposta: document.getElementById("m-garantia").value.trim(),
@@ -1246,6 +1265,7 @@ function exportarExcel() {
     "Nº LICITAÇÃO": l.numero || "",
     "MODALIDADE": l.modalidade || "",
     "SERVIÇOS": (l.servicos || []).map(s => `${s.nome}${s.pct != null ? " " + s.pct + "%" : ""}`).join("\n") || servicosDetectados(l).join(", "),
+    "QTD. PAVIMENTAÇÃO ASFÁLTICA": l.qtdAsfalto || "",
     "VALOR": l.valor ?? "",
     "OBJETO": l.objeto || "",
     "ATESTADOS SOLICITADOS": l.atestados || "",
@@ -1257,7 +1277,7 @@ function exportarExcel() {
     "LINK PORTAL": l.linkPortal || ""
   }));
   const ws = XLSX.utils.json_to_sheet(rows);
-  ws["!cols"] = [10, 16, 28, 20, 22, 20, 30, 16, 60, 40, 22, 35, 22, 22, 40, 40].map(w => ({ wch: w }));
+  ws["!cols"] = [10, 16, 28, 20, 22, 20, 30, 28, 16, 60, 40, 22, 35, 22, 22, 40, 40].map(w => ({ wch: w }));
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "CONTROLE DE LICITAÇÕES");
   const d = new Date();
