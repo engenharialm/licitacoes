@@ -136,7 +136,18 @@
 
   .col-objeto{min-width:300px;max-width:420px;}
   .col-serv{min-width:200px;}
-  .col-atest{min-width:240px;max-width:340px;white-space:pre-line;}
+  .col-atest{min-width:210px;max-width:280px;}
+  .atest-btn{
+    display:block;width:100%;text-align:left;background:var(--accent-dim);border:1px solid transparent;border-radius:8px;
+    padding:8px 10px;cursor:pointer;font-family:inherit;color:var(--text);transition:.12s;
+  }
+  .atest-btn:hover{border-color:var(--accent-light);background:#CFE7F2;}
+  .atest-label{display:block;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--accent);}
+  .atest-main{display:block;font-size:.76rem;font-weight:700;margin:2px 0 4px;}
+  .atest-more{display:block;font-size:.68rem;font-weight:600;color:var(--accent);}
+  #atest-lista{list-style:none;display:flex;flex-direction:column;gap:8px;}
+  #atest-lista li{padding:10px 12px;border:1px solid var(--border);border-radius:8px;font-size:.82rem;line-height:1.45;background:var(--bg);}
+  #atest-lista li.principal{border-color:var(--accent);background:var(--accent-dim);font-weight:600;}
   .col-obs{min-width:180px;max-width:260px;white-space:pre-line;}
   .clamp{display:-webkit-box;-webkit-line-clamp:4;-webkit-box-orient:vertical;overflow:hidden;}
   .clamp.open{-webkit-line-clamp:unset;}
@@ -286,8 +297,8 @@
 
       <div class="dash-grid">
         <div class="panel">
-          <div class="panel-head">Status das licitações em que vamos participar</div>
-          <div class="panel-body" id="dash-status"></div>
+          <div class="panel-head">Tipo de pavimento conferido no edital <small>pendentes + SIM</small></div>
+          <div class="panel-body" id="dash-pavimento"></div>
         </div>
         <div class="panel">
           <div class="panel-head">Oportunidades abertas por serviço <small>pendentes + SIM</small></div>
@@ -328,7 +339,6 @@
             <option value="Fornecimento">Fornecimento de material</option>
           </select>
           <select id="f-modalidade"><option value="">Todas as modalidades</option></select>
-          <select id="f-status"><option value="">Todos os status</option></select>
           <select id="f-prazo">
             <option value="">Qualquer prazo</option>
             <option value="7">Sessão em até 7 dias</option>
@@ -351,7 +361,6 @@
                 <th class="sortable" data-sort="valor">Valor</th>
                 <th>Objeto</th>
                 <th>Atestados solicitados</th>
-                <th class="sortable" data-sort="status">Status</th>
                 <th>Observação</th>
                 <th>Garantia de proposta</th>
                 <th>Vencedora e desconto final</th>
@@ -389,7 +398,7 @@
           <input type="datetime-local" id="m-data">
         </div>
         <div class="field">
-          <label>Status</label>
+          <label>Resultado (opcional)</label>
           <select id="m-status"></select>
         </div>
         <div class="field">
@@ -470,6 +479,27 @@
     <div class="modal-foot">
       <span class="muted small" id="pncp-resumo"></span>
       <button class="btn btn-accent" id="pncp-fechar" disabled>Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: atestados exigidos -->
+<div class="modal-backdrop" id="modal-atest">
+  <div class="modal" style="max-width:620px;">
+    <div class="modal-head">
+      <div>
+        <h2>Atestados exigidos</h2>
+        <div class="muted small" id="atest-sub" style="margin-top:4px;"></div>
+      </div>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <ul id="atest-lista"></ul>
+      <p class="muted small" id="atest-nota" style="margin-top:12px;"></p>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-ghost btn-sm" id="atest-editar" data-edit="">Editar atestados</button>
+      <button class="btn btn-accent" data-close>Fechar</button>
     </div>
   </div>
 </div>
@@ -629,18 +659,7 @@ function diasAte(iso) {
 }
 
 /* ------------------------------ regras de negócio ------------------------------ */
-const STATUS = [
-  "EM ANÁLISE", "ATENDEMOS OS ATESTADOS", "NÃO ATENDEMOS OS ATESTADOS", "EM ANDAMENTO",
-  "PROPOSTA ENVIADA", "SUSPENSO", "GANHAMOS", "PERDEMOS", "FRACASSADA / DESERTA", "CANCELADA"
-];
 const STATUS_FINAIS = ["GANHAMOS", "PERDEMOS", "FRACASSADA / DESERTA", "CANCELADA"];
-function statusClasse(s) {
-  if (s === "GANHAMOS") return "lime";
-  if (s === "PERDEMOS" || s === "NÃO ATENDEMOS OS ATESTADOS" || s === "CANCELADA") return "danger";
-  if (s === "SUSPENSO" || s === "FRACASSADA / DESERTA") return "warn";
-  if (s === "PROPOSTA ENVIADA") return "info";
-  return "accent";
-}
 
 const MODALIDADES = { 4: "Concorrência Eletrônica", 5: "Concorrência Presencial", 6: "Pregão Eletrônico", 8: "Dispensa" };
 const RX = {
@@ -829,13 +848,13 @@ function renderDashboard() {
       <td class="nowrap"><b>${fmtDateTime(l.dataSessao)}</b><div>${prazoBadge(l)}</div></td>
       <td><div class="clamp" style="-webkit-line-clamp:2;">${escapeHtml(l.objeto)}</div><div class="muted small">${escapeHtml(l.cidade)} · ${escapeHtml(l.orgao)}</div></td>
       <td class="nowrap">${fmtMoney(l.valor)}</td>
-      <td>${l.status ? `<span class="badge ${statusClasse(l.status)}">${escapeHtml(l.status)}</span>` : ""}</td>
     </tr>`).join("")}</tbody></table>`
     : `<div class="empty-state" style="padding:20px;">Marque SIM nas licitações em que vamos participar para elas aparecerem aqui.</div>`;
 
   const contar = (lista, fn) => { const m = new Map(); for (const l of lista) for (const k of [].concat(fn(l))) if (k) m.set(k, (m.get(k) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
-  barras("dash-status", contar(sim, l => l.status || "SEM STATUS"));
   const abertas = licitacoes.filter(l => isPendente(l) || (isSim(l) && isAtiva(l)));
+  const nomesPavimento = { asfaltico: "Asfáltico", calcamento: "Calçamento (fora do perfil)", misto: "Asfalto + calçamento", nao_identificado: "Não é obra de pavimentação" };
+  barras("dash-pavimento", contar(abertas, l => nomesPavimento[l.tipoPavimentoEdital] || "Edital ainda não conferido"));
   barras("dash-servico", contar(abertas, l => automatica(l) ? servicosDetectados(l) : (l.servicos || []).map(s => s.nome)).slice(0, 8));
   barras("dash-modalidade", contar(abertas, l => l.modalidade || "Não informada").slice(0, 8));
   const porCidade = new Map();
@@ -852,7 +871,6 @@ function fillSelect(select, values) {
 }
 function renderFilters() {
   fillSelect(document.getElementById("f-modalidade"), distinct(l => l.modalidade));
-  fillSelect(document.getElementById("f-status"), [...new Set([...STATUS, ...distinct(l => l.status)])]);
 }
 
 function getFiltered() {
@@ -861,7 +879,6 @@ function getFiltered() {
   const fServ = document.getElementById("f-servico").value;
   const fTipo = document.getElementById("f-tipo").value;
   const fMod = document.getElementById("f-modalidade").value;
-  const fStatus = document.getElementById("f-status").value;
   const fPrazo = Number(document.getElementById("f-prazo").value) || 0;
 
   const list = licitacoes.filter(l => {
@@ -877,7 +894,6 @@ function getFiltered() {
     }
     if (fTipo && (fonte(l).tipo || "Obra") !== fTipo) return false;
     if (fMod && l.modalidade !== fMod) return false;
-    if (fStatus && l.status !== fStatus) return false;
     if (fPrazo) { const d = diasAte(l.dataSessao); if (d === null || d < 0 || d > fPrazo) return false; }
     if (busca) {
       const hay = norm([l.orgao, l.cidade, l.objeto, l.numero, l.observacao, l.atestados, l.status].join(" "));
@@ -912,6 +928,46 @@ function servicosHtml(l) {
   return (det.length ? `<div class="badges">${det.map(d => `<span class="badge grey">${d}</span>`).join("")}</div><div class="muted small" style="margin-top:4px;">${det.length > 1 ? "misto — " : ""}conferir % na planilha</div>` : `<span class="muted">—</span>`) + extras;
 }
 
+/* ------------------------------ atestados ------------------------------ */
+const RX_ATESTADO_ASFALTO = /cbuq|asfalt|betumin|\btsd\b|tratamento superficial|\bpmf\b|microrrevest|micro revest|revestimento|capa|recape|fresagem|tapa.?buraco|imprima/;
+function linhasAtestado(l) {
+  return (l.atestados || "").split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+}
+const RX_QUANTIDADE = /\d[\d.,]*\s*(m²|m2|m³|m3|t\b|ton|toneladas|km|m\b|metros)/i;
+// o principal é o atestado de asfalto com quantidade (é o que define se a LM consegue participar);
+// linhas de título ("...:") não contam
+function indicePrincipal(linhas) {
+  let melhor = -1, nota = -1;
+  linhas.forEach((s, i) => {
+    if (/:\s*$/.test(s)) return;
+    const n = (RX_ATESTADO_ASFALTO.test(norm(s)) ? 2 : 0) + (RX_QUANTIDADE.test(s) ? 1 : 0);
+    if (n > nota) { nota = n; melhor = i; }
+  });
+  return melhor >= 0 ? melhor : 0;
+}
+function atestadoCelula(l) {
+  const linhas = linhasAtestado(l);
+  if (!linhas.length) return `<span class="muted">—</span>`;
+  const principal = linhas[indicePrincipal(linhas)];
+  return `<button class="atest-btn" data-atest="${escapeHtml(l.id)}" title="Clique para ver todos os atestados exigidos">
+    <span class="atest-label">Principal</span>
+    <span class="atest-main">${escapeHtml(principal)}</span>
+    ${linhas.length > 1 ? `<span class="atest-more">ver todos (${linhas.length}) →</span>` : `<span class="atest-more">detalhes →</span>`}
+  </button>`;
+}
+function abrirAtestados(id) {
+  const l = licitacoes.find(x => x.id === id);
+  if (!l) return;
+  const linhas = linhasAtestado(l);
+  const ip = indicePrincipal(linhas);
+  document.getElementById("atest-sub").textContent = `${l.cidade || ""} · ${l.orgao || ""} · ${l.numero || ""}`;
+  document.getElementById("atest-lista").innerHTML = linhas.map((s, i) => `
+    <li class="${i === ip ? "principal" : ""}">${i === ip ? `<span class="badge accent">PRINCIPAL</span> ` : ""}${escapeHtml(s)}</li>`).join("");
+  document.getElementById("atest-nota").textContent = l.preenchidoAuto ? "Extraído do edital automaticamente — confira no edital antes de decidir." : "";
+  document.getElementById("atest-editar").dataset.edit = l.id;
+  document.getElementById("modal-atest").classList.add("open");
+}
+
 function objetoBadges(l) {
   const p = fonte(l);
   const b = [];
@@ -929,7 +985,7 @@ function renderTabela() {
   document.getElementById("tab-count-controle").textContent = licitacoes.filter(l => isPendente(l) || isSim(l)).length;
   const tbody = document.getElementById("lic-table");
   if (!list.length) {
-    tbody.innerHTML = `<tr><td colspan="14"><div class="empty-state">${licitacoes.length
+    tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state">${licitacoes.length
       ? "Nenhuma licitação com esses filtros."
       : "Nenhuma licitação ainda.<br>Clique em <b>⟳ Atualizar do PNCP</b> para buscar as abertas em MG, ou em <b>+ Nova licitação</b> para cadastrar uma privada (VINCI, ITINERA...)."}</div></td></tr>`;
     return;
@@ -951,8 +1007,7 @@ function renderTabela() {
       <td class="nowrap">${fmtMoney(l.valor) || `<span class="muted">${l.origem === "ALERTA" ? "não informado (ver edital)" : "sigiloso / n/i"}</span>`}</td>
       <td class="col-objeto"><div class="clamp">${escapeHtml(l.objeto)}</div>${(l.objeto || "").length > 260 ? `<span class="more" data-more>ver tudo</span>` : ""}
         ${objetoBadges(l)}</td>
-      <td class="col-atest">${escapeHtml(l.atestados) || `<span class="muted">—</span>`}</td>
-      <td>${l.status ? `<span class="badge ${statusClasse(l.status)}">${escapeHtml(l.status)}</span>` : `<span class="muted">—</span>`}</td>
+      <td class="col-atest">${atestadoCelula(l)}</td>
       <td class="col-obs">${escapeHtml(l.observacao)}</td>
       <td>${escapeHtml(l.garantiaProposta)}</td>
       <td>${escapeHtml(l.vencedora)}</td>
@@ -973,7 +1028,6 @@ async function setInteresse(id, valor) {
   if (!requireUnlock()) return;
   const novo = l.interesse === valor ? null : valor;
   const data = { interesse: novo, atualizadoEm: new Date().toISOString() };
-  if (novo === "SIM" && !l.status) data.status = "EM ANÁLISE";
   try {
     await store.update(id, data);
     Object.assign(l, data);
@@ -1009,8 +1063,8 @@ function abrirModal(id) {
   setModalInteresse(l.interesse || "");
   document.getElementById("m-data").value = (l.dataSessao || "").slice(0, 16);
   const selStatus = document.getElementById("m-status");
-  const opcoes = [...new Set(["", ...STATUS, l.status || ""])];
-  selStatus.innerHTML = opcoes.map(s => `<option value="${escapeHtml(s)}">${s ? escapeHtml(s) : "— sem status —"}</option>`).join("");
+  const opcoes = [...new Set(["", ...STATUS_FINAIS, l.status || ""])];
+  selStatus.innerHTML = opcoes.map(s => `<option value="${escapeHtml(s)}">${s ? escapeHtml(s) : "— ainda sem resultado —"}</option>`).join("");
   selStatus.value = l.status || "";
   document.getElementById("m-orgao").value = l.orgao || "";
   document.getElementById("m-cidade").value = l.cidade || "";
@@ -1443,7 +1497,7 @@ function exportarExcel() {
     "VALOR": l.valor ?? "",
     "OBJETO": l.objeto || "",
     "ATESTADOS SOLICITADOS": l.atestados || "",
-    "STATUS": l.status || "",
+    "RESULTADO": l.status || "",
     "OBSERVAÇÃO": l.observacao || "",
     "GARANTIA DE PROPOSTA": l.garantiaProposta || "",
     "VENCEDORA E DESCONTO FINAL": l.vencedora || "",
@@ -1479,15 +1533,17 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
 document.addEventListener("click", e => {
   const intBtn = e.target.closest(".int-btn[data-int]");
   if (intBtn) { setInteresse(intBtn.dataset.id, intBtn.dataset.int); return; }
+  const atest = e.target.closest("[data-atest]");
+  if (atest) { abrirAtestados(atest.dataset.atest); return; }
   const edit = e.target.closest("[data-edit]");
-  if (edit) { abrirModal(edit.dataset.edit); return; }
+  if (edit) { document.getElementById("modal-atest").classList.remove("open"); abrirModal(edit.dataset.edit); return; }
   const go = e.target.closest("[data-go]");
   if (go) { irPara(go.dataset.go); return; }
   const more = e.target.closest("[data-more]");
   if (more) { const c = more.previousElementSibling; c.classList.toggle("open"); more.textContent = c.classList.contains("open") ? "ver menos" : "ver tudo"; return; }
   if (e.target.closest("[data-close]")) e.target.closest(".modal-backdrop").classList.remove("open");
 });
-["f-busca", "f-interesse", "f-servico", "f-tipo", "f-modalidade", "f-status", "f-prazo"].forEach(id => {
+["f-busca", "f-interesse", "f-servico", "f-tipo", "f-modalidade", "f-prazo"].forEach(id => {
   document.getElementById(id).addEventListener(id === "f-busca" ? "input" : "change", renderTabela);
 });
 document.querySelectorAll("th.sortable").forEach(th => th.addEventListener("click", () => {
