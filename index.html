@@ -246,10 +246,94 @@
     padding:12px 16px;border-radius:8px;font-size:.8rem;box-shadow:0 4px 16px rgba(0,0,0,.12);max-width:340px;}
   .toast.error{border-left-color:var(--danger);}
 
+  #btn-menu{display:none;}
+  .t-curto{display:none;}
+
+  /* ---------- celular ---------- */
   @media (max-width:720px){
+    header{padding:10px 14px;flex-wrap:nowrap;}
+    .brand{gap:10px;min-width:0;}
+    .brand .logo{width:32px;height:32px;}
+    .brand h1{font-size:.95rem;}
+    .brand span{display:none;}
+    #btn-menu{display:inline-flex;margin-left:auto;}
+    /* ações do topo viram um menu que abre por cima da página */
+    .header-actions{
+      display:none;position:absolute;top:100%;left:0;right:0;flex-direction:column;align-items:stretch;gap:8px;
+      padding:12px 14px 16px;background:var(--bg-elev);border-bottom:1px solid var(--border);box-shadow:0 8px 20px rgba(0,0,0,.12);
+    }
+    header.menu-aberto .header-actions{display:flex;}
+    .header-actions .btn{justify-content:center;padding:12px 14px;font-size:.85rem;}
+    .header-actions .status-pill{justify-content:center;}
+
+    .tabs{padding:0 8px;overflow-x:auto;position:sticky;top:53px;z-index:40;}
+    .tab{padding:12px 10px;white-space:nowrap;font-size:.82rem;}
+    .t-longo{display:none;}
+    .t-curto{display:inline;}
+
+    main{padding:14px 12px 60px;}
+    #regiao-resumo{display:none;}
+    .update-line{margin:0 0 12px;font-size:.7rem;}
+
+    .cards-row{grid-template-columns:1fr 1fr;gap:10px;}
+    .card{padding:12px 14px;}
+    .card .label{font-size:.62rem;}
+    .card .value{font-size:1.25rem;}
+    .card .sub{font-size:.66rem;}
+
     .form-grid{grid-template-columns:1fr;}
-    .dash-grid{grid-template-columns:1fr;}
+    .dash-grid{grid-template-columns:1fr;gap:12px;}
+    .panel-head{padding:12px 14px;flex-wrap:wrap;}
+    .panel-body{padding:10px 14px;}
     .bar-row{grid-template-columns:110px 1fr 60px;}
+    .panel-body table td{padding:8px 6px;}
+    .panel-body table td.nowrap{white-space:normal;}
+    .decide-item{grid-template-columns:78px 1fr;gap:8px;}
+    .decide-item .int-group{grid-column:1 / -1;justify-content:flex-end;}
+
+    .toolbar{display:grid;grid-template-columns:1fr 1fr;padding:12px;}
+    .toolbar input[type=text]{grid-column:1 / -1;min-width:0;}
+    .toolbar select{min-width:0;width:100%;}
+    .toolbar .spacer{display:none;}
+    .toolbar-count{grid-column:1 / -1;}
+
+    /* tabelas viram cartões, com o nome da coluna em cima de cada valor */
+    .table-wrap{max-height:none;overflow:visible;}
+    .tabela-cards thead{display:none;}
+    .tabela-cards, .tabela-cards tbody{display:block;}
+    .tabela-cards tr{display:block;position:relative;margin:10px;padding:12px 14px;border:1px solid var(--border);border-radius:10px;background:var(--card);}
+    .tabela-cards tr.row-sim{border-color:var(--accent);}
+    .tabela-cards td{display:block;padding:5px 0;border:none;max-width:none;min-width:0;}
+    .tabela-cards td[data-label]::before{
+      content:attr(data-label);display:block;font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:var(--text-faint);margin-bottom:2px;
+    }
+    .tabela-cards td.vazia{display:none;}
+    .tabela-cards tbody tr:hover{background:var(--card);}
+    .tabela-cards tr.row-sim td:first-child{box-shadow:none;}
+    /* cartão da licitação: SIM/NÃO no topo, campos curtos lado a lado, textos longos em largura cheia */
+    #lic-table tr{display:grid;grid-template-columns:1fr 1fr;column-gap:12px;}
+    #lic-table td:first-child{grid-column:1 / -1;display:flex;justify-content:flex-end;padding:0 0 4px;}
+    #lic-table td:first-child::before{display:none;}
+    #lic-table td:nth-child(6), #lic-table td:nth-child(8), #lic-table td:nth-child(9), #lic-table td:nth-child(13){grid-column:1 / -1;}
+    #lic-table td:nth-child(11), #lic-table td:nth-child(12){display:none;}
+    #lic-table td[colspan]{grid-column:1 / -1;}
+    #lic-table .clamp{-webkit-line-clamp:4;}
+    #lic-table .serv-item:nth-child(n+4){display:none;}
+    #lic-table .serv-item{margin-bottom:2px;}
+    #lic-table .serv-bar, #lic-table .badge.nova[title], #lic-table td:nth-child(3) .muted.small{display:none;}
+    .row-actions{justify-content:flex-start;}
+    .icon-btn{height:34px;padding:0 12px;font-size:.74rem;}
+    .int-btn{padding:9px 14px;font-size:.78rem;}
+    .clamp{-webkit-line-clamp:5;}
+
+    .modal-backdrop{padding:0;align-items:stretch;}
+    .modal{max-width:none !important;max-height:none;height:100%;border-radius:0;border:none;}
+    .modal-foot{position:sticky;bottom:0;background:var(--bg-elev);flex-wrap:wrap;}
+    .serv-row{grid-template-columns:1fr 80px 32px;}
+    .doc-add{grid-template-columns:1fr;}
+    .doc-item{flex-direction:column;align-items:flex-start;}
+    .toast-wrap{left:12px;right:12px;bottom:12px;}
+    .toast{max-width:none;}
   }
 
   @media print{
@@ -277,7 +361,8 @@
         <span>LM CONSTRUTORA — PAVIMENTAÇÃO · TERRAPLENAGEM · DRENAGEM</span>
       </div>
     </div>
-    <div class="header-actions">
+    <button class="btn btn-ghost btn-sm" id="btn-menu" type="button" aria-expanded="false" aria-controls="header-actions">Menu</button>
+    <div class="header-actions" id="header-actions">
       <div class="status-pill" id="conn-status">
         <span class="status-dot"></span>
         <span id="conn-text">Modo local (este navegador)</span>
@@ -292,9 +377,9 @@
   </header>
 
   <nav class="tabs">
-    <button class="tab active" data-view="dashboard">Dashboard</button>
-    <button class="tab" data-view="controle">Controle de licitações <span class="count" id="tab-count-controle">0</span></button>
-    <button class="tab" data-view="ganhas">Ganhas pela LM <span class="count" id="tab-count-ganhas">0</span></button>
+    <button class="tab active" data-view="dashboard"><span class="t-longo">Dashboard</span><span class="t-curto">Painel</span></button>
+    <button class="tab" data-view="controle"><span class="t-longo">Controle de licitações</span><span class="t-curto">Licitações</span> <span class="count" id="tab-count-controle">0</span></button>
+    <button class="tab" data-view="ganhas"><span class="t-longo">Ganhas pela LM</span><span class="t-curto">Ganhas</span> <span class="count" id="tab-count-ganhas">0</span></button>
   </nav>
 
   <main>
@@ -359,7 +444,7 @@
           <button class="btn btn-ghost btn-sm" id="gan-add" type="button">+ Adicionar à carteira</button>
         </div>
         <div class="table-wrap" style="max-height:none;">
-          <table>
+          <table class="tabela-cards">
             <thead><tr>
               <th>Contrato</th><th>Cliente / órgão</th><th>Referência</th><th>Valor ganho</th><th>Desconto</th><th>Contrato no PNCP</th><th class="no-print"></th>
             </tr></thead>
@@ -371,7 +456,7 @@
       <div class="panel" style="margin-bottom:16px;">
         <div class="panel-head">Processos em acompanhamento <small id="gan-total-acomp"></small></div>
         <div class="table-wrap" style="max-height:none;">
-          <table>
+          <table class="tabela-cards">
             <thead><tr>
               <th>Local</th><th>Fase</th><th>Valor (R$)</th><th>Desc. LM</th><th>Vencedora</th><th>Pos.</th><th>Situação informada</th><th>Próximo prazo</th><th class="no-print"></th>
             </tr></thead>
@@ -385,7 +470,7 @@
           <select id="gan-ano" class="btn-sm" style="border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-family:inherit;"></select>
         </div>
         <div class="table-wrap" style="max-height:none;">
-          <table>
+          <table class="tabela-cards">
             <thead><tr>
               <th>Assinatura</th><th>Órgão</th><th>Município</th><th>Contrato</th><th>Objeto</th><th>Valor</th><th>Na carteira?</th><th class="no-print"></th>
             </tr></thead>
@@ -424,7 +509,7 @@
           <span class="toolbar-count" id="lic-count"></span>
         </div>
         <div class="table-wrap">
-          <table>
+          <table class="tabela-cards">
             <thead>
               <tr>
                 <th>Interesse</th>
@@ -1339,7 +1424,7 @@ function servicosHtml(l) {
   const extras = (l.qtdAsfalto ? `<div class="small" style="margin-top:4px;"><b>Asfalto:</b> ${escapeHtml(l.qtdAsfalto)}</div>` : "")
     + (l.preenchidoAuto ? `<div class="badges"><span class="badge nova" title="${escapeHtml(l.preenchidoAuto)}">preenchido do edital — conferir</span></div>` : "");
   if (lista.length) {
-    return lista.map(s => `
+    return [...lista].sort((a, b) => (Number(b.pct) || 0) - (Number(a.pct) || 0)).map(s => `
       <div class="serv-item">
         <div class="serv-line"><span>${escapeHtml(s.nome)}</span><b>${s.pct !== "" && s.pct != null ? Number(s.pct).toLocaleString("pt-BR") + "%" : ""}</b></div>
         ${s.pct ? `<div class="serv-bar"><i style="width:${Math.min(100, Number(s.pct))}%"></i></div>` : ""}
@@ -1585,6 +1670,20 @@ function renderTabela() {
       </div></td>
     </tr>`;
   }).join("");
+  rotularTabela(tbody);
+}
+
+// no celular cada linha vira um cartão: copia o nome da coluna para cada célula e marca as vazias
+function rotularTabela(tbody) {
+  const nomes = [...tbody.closest("table").querySelectorAll("thead th")].map(th => th.textContent.trim());
+  for (const tr of tbody.rows) {
+    [...tr.cells].forEach((td, i) => {
+      if (td.colSpan > 1) return;
+      if (nomes[i]) td.dataset.label = nomes[i];
+      const texto = td.textContent.trim();
+      td.classList.toggle("vazia", !td.querySelector("button, a, input, select") && (texto === "" || texto === "—"));
+    });
+  }
 }
 
 /* ------------------------------ interesse SIM / NÃO ------------------------------ */
@@ -2177,6 +2276,8 @@ function renderGanhas() {
       <td class="nowrap">${g.prazo ? `<b>${fmtDateTime(g.prazo)}</b><div class="muted small">${escapeHtml(g.etapa || "")}</div>` : "—"}</td>
       <td class="no-print"><button class="icon-btn" data-gan-edit="${escapeHtml(g.id)}">Editar</button></td>
     </tr>`).join("") : `<tr><td colspan="9"><div class="empty-state">Nenhum processo em acompanhamento.</div></td></tr>`;
+  rotularTabela(document.getElementById("gan-ganhos"));
+  rotularTabela(document.getElementById("gan-acomp"));
 
   renderContratosPncp();
 }
@@ -2207,6 +2308,7 @@ function renderContratosPncp() {
       </div></td>
     </tr>`;
   }).join("") : `<tr><td colspan="8"><div class="empty-state">Nenhum contrato da LM no PNCP neste ano.</div></td></tr>`;
+  rotularTabela(tbody);
 }
 
 // busca no PNCP os contratos em que a LM é a contratada (pelo CNPJ)
@@ -2360,6 +2462,15 @@ try { soRegiao = localStorage.getItem("licSoRegiao") === "1"; } catch {}
 document.getElementById("btn-regioes").addEventListener("click", abrirRegioes);
 document.getElementById("doc-add-btn").addEventListener("click", adicionarDocumento);
 document.getElementById("gan-add").addEventListener("click", () => abrirGanho(null));
+// menu do celular: abre/fecha as ações do topo; fecha ao escolher uma ação
+const cabecalho = document.querySelector("header");
+document.getElementById("btn-menu").addEventListener("click", () => {
+  const aberto = cabecalho.classList.toggle("menu-aberto");
+  document.getElementById("btn-menu").setAttribute("aria-expanded", aberto ? "true" : "false");
+});
+document.getElementById("header-actions").addEventListener("click", e => {
+  if (e.target.closest("button")) { cabecalho.classList.remove("menu-aberto"); document.getElementById("btn-menu").setAttribute("aria-expanded", "false"); }
+});
 document.getElementById("gan-m-salvar").addEventListener("click", salvarGanho);
 document.getElementById("gan-m-excluir").addEventListener("click", excluirGanho);
 document.getElementById("gan-ano").addEventListener("change", renderContratosPncp);
