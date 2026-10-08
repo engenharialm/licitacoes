@@ -469,6 +469,7 @@
         <div class="field full">
           <label>Link do portal / edital</label>
           <input type="text" id="m-link" placeholder="https://...">
+          <div id="m-atalhos" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"></div>
         </div>
       </div>
     </div>
@@ -1253,6 +1254,49 @@ function renderDocsManuais(l) {
     </div>`).join("") : `<div class="muted small" style="margin-bottom:6px;">Nenhum link adicionado. Use para planilhas que só estão no Drive da prefeitura, no site do DER etc.</div>`;
 }
 
+// arquivos da licitação no PNCP, separados em edital, planilha e demais
+async function arquivosPncp(c) {
+  const r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${c.cnpj}/compras/${c.ano}/${c.seq}/arquivos`);
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  const arqs = (await r.json()).filter(a => a.statusAtivo !== false)
+    .map(a => ({ titulo: a.titulo || "arquivo", tipo: a.tipoDocumentoNome || "", data: (a.dataPublicacaoPncp || "").slice(0, 10),
+      url: `https://pncp.gov.br/pncp-api/v1/orgaos/${c.cnpj}/compras/${c.ano}/${c.seq}/arquivos/${a.sequencialDocumento}` }));
+  const ehEdital = a => /edital/i.test(a.tipo) || /edital/i.test(norm(a.titulo));
+  const ehPlanilha = a => RX_DOC_PLANILHA.test(norm(a.titulo + " " + a.tipo));
+  const editais = arqs.filter(ehEdital), planilhas = arqs.filter(a => !ehEdital(a) && ehPlanilha(a));
+  const resto = arqs.filter(a => !editais.includes(a) && !planilhas.includes(a));
+  return { arqs, editais, planilhas, resto };
+}
+
+// botões Edital / Planilha / Portal no formulário de edição
+async function renderAtalhosDocs(l) {
+  const box = document.getElementById("m-atalhos");
+  const portal = safeUrl(l.linkPortal);
+  const manuais = l.documentos || [];
+  const manualEdital = manuais.find(d => /edital/i.test(norm(d.titulo)));
+  const manualPlanilha = manuais.find(d => RX_DOC_PLANILHA.test(norm(d.titulo)));
+  const botao = (rotulo, url, titulo) => url
+    ? `<a class="btn btn-ghost btn-sm" href="${escapeHtml(url)}" target="_blank" rel="noopener" title="${escapeHtml(titulo || "")}">${rotulo}</a>`
+    : `<button type="button" class="btn btn-ghost btn-sm" disabled title="${escapeHtml(titulo || "")}">${rotulo}</button>`;
+  const montar = (edital, planilha) => {
+    box.innerHTML = botao("Abrir edital", edital?.url, edital?.titulo || "Edital não encontrado no PNCP")
+      + botao("Abrir planilha", planilha?.url, planilha?.titulo || "Planilha não publicada separada no PNCP — veja em Todos os documentos")
+      + (portal ? botao("Portal", portal, portal) : "")
+      + (l.id ? `<button type="button" class="btn btn-ghost btn-sm" data-docs="${escapeHtml(l.id)}">Todos os documentos</button>` : "");
+  };
+  montar(manualEdital, manualPlanilha);
+  const c = pncpCompra(l);
+  if (!c || (manualEdital && manualPlanilha)) return;
+  try {
+    const { editais, planilhas } = await arquivosPncp(c);
+    if (editingId !== l.id) return;   // o usuário já trocou de licitação
+    // edital principal: o mais recente que não seja anexo compactado
+    const edital = manualEdital || [...editais].filter(a => !/\.(zip|rar|7z)$/i.test(a.titulo)).sort((a, b) => b.data.localeCompare(a.data))[0] || editais[0];
+    const planilha = manualPlanilha || planilhas.find(a => /planilha|orcament/.test(norm(a.titulo))) || planilhas[0];
+    montar(edital, planilha);
+  } catch { /* sem PNCP agora: ficam os botões manuais e "Todos os documentos" */ }
+}
+
 async function abrirDocumentos(id) {
   const l = licitacoes.find(x => x.id === id);
   if (!l) return;
@@ -1282,15 +1326,7 @@ async function abrirDocumentos(id) {
   }
   principais.innerHTML = `<div class="muted small" style="padding:8px 0;">Buscando os arquivos no PNCP…</div>`;
   try {
-    const r = await fetch(`https://pncp.gov.br/pncp-api/v1/orgaos/${c.cnpj}/compras/${c.ano}/${c.seq}/arquivos`);
-    if (!r.ok) throw new Error("HTTP " + r.status);
-    const arqs = (await r.json()).filter(a => a.statusAtivo !== false)
-      .map(a => ({ titulo: a.titulo || "arquivo", tipo: a.tipoDocumentoNome || "", data: (a.dataPublicacaoPncp || "").slice(0, 10),
-        url: `https://pncp.gov.br/pncp-api/v1/orgaos/${c.cnpj}/compras/${c.ano}/${c.seq}/arquivos/${a.sequencialDocumento}` }));
-    const ehEdital = a => /edital/i.test(a.tipo) || /edital/i.test(norm(a.titulo));
-    const ehPlanilha = a => RX_DOC_PLANILHA.test(norm(a.titulo + " " + a.tipo));
-    const editais = arqs.filter(ehEdital), planilhas = arqs.filter(a => !ehEdital(a) && ehPlanilha(a));
-    const resto = arqs.filter(a => !editais.includes(a) && !planilhas.includes(a));
+    const { arqs, editais, planilhas, resto } = await arquivosPncp(c);
     const sub = a => [a.tipo, a.data ? "publicado em " + a.data.split("-").reverse().join("/") : ""].filter(Boolean).join(" · ");
     let html = editais.map(a => docItemHtml("Edital — " + a.titulo, sub(a), a.url, true)).join("");
     const compactados = arqs.filter(a => /\.(zip|rar|7z)$/i.test(a.titulo) || /anexo/i.test(norm(a.titulo)));
@@ -1466,6 +1502,7 @@ function abrirModal(id) {
       <br><a href="${escapeHtml(safeUrl(a.link))}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;">Abrir no Alerta Licitação →</a>`;
   } else box.style.display = "none";
   document.getElementById("m-excluir").style.visibility = id && !automatica(l) ? "visible" : "hidden";
+  renderAtalhosDocs(l);
   modalLic.classList.add("open");
 }
 
