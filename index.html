@@ -271,7 +271,38 @@
 
   .empty-state{padding:50px 20px;text-align:center;color:var(--text-faint);font-size:.85rem;line-height:1.6;}
 
-  .decide-item{display:grid;grid-template-columns:90px 1fr auto;gap:12px;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);}
+  .decide-item{display:grid;grid-template-columns:90px 1fr auto;gap:12px;align-items:center;padding:10px 6px;border-bottom:1px solid var(--border);border-radius:6px;}
+  .decide-item .cid{font-weight:700;font-size:.9rem;color:#0F2A3D;}
+  .decide-item .val{font-weight:700;font-size:.82rem;white-space:nowrap;text-align:right;}
+  .decide-item .val small{display:block;font-weight:500;color:var(--text-faint);font-size:.66rem;}
+  .dash-topo{display:grid;grid-template-columns:minmax(0,1fr) 330px;gap:16px;align-items:start;margin-bottom:16px;}
+  .dash-topo .dash-grid{margin-bottom:0;}
+  .dash-cal{padding:14px;position:sticky;top:12px;}
+  .cal-head{display:flex;align-items:center;gap:6px;margin-bottom:10px;}
+  .cal-head b{flex:1;text-align:center;text-transform:capitalize;font-size:.95rem;}
+  .cal-head .icon-btn{min-width:30px;}
+  .cal-grade{display:grid;grid-template-columns:repeat(7,1fr);gap:3px;text-align:center;}
+  .cal-sem{font-size:.62rem;color:var(--text-faint);font-weight:700;padding:2px 0;}
+  .cal-dia{border:1px solid transparent;background:none;border-radius:8px;padding:5px 0 4px;font-family:inherit;font-size:.78rem;color:var(--text);cursor:default;min-height:40px;display:flex;flex-direction:column;align-items:center;gap:3px;}
+  .cal-dia.fora{color:#CBD5E1;}
+  .cal-dia.tem{cursor:pointer;font-weight:700;}
+  .cal-dia.tem:hover{background:var(--card-hover);}
+  .cal-dia.hoje{border-color:var(--accent);}
+  .cal-dia.sel{background:var(--accent);color:#fff;}
+  .cal-dia .pts{display:flex;gap:2px;height:6px;}
+  .cal-dia .pts i{width:6px;height:6px;border-radius:50%;}
+  .cal-dia.sel .pts i{box-shadow:0 0 0 1.5px #fff;}
+  .cal-leg{display:flex;gap:12px;justify-content:center;font-size:.68rem;color:var(--text-faint);margin:8px 0 4px;}
+  .cal-leg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;}
+  .cal-lista-titulo{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-dim);margin:12px 0 4px;display:flex;justify-content:space-between;align-items:center;}
+  .cal-lista{max-height:360px;overflow:auto;}
+  .cal-item{padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;border-left:3px solid var(--warning);}
+  .cal-item.sim{border-left-color:var(--accent);}
+  .cal-item:hover{background:var(--card-hover);}
+  .cal-item .l1{display:flex;justify-content:space-between;gap:8px;font-size:.8rem;}
+  .cal-item .l1 b{color:#0F2A3D;}
+  .cal-item .obj{font-size:.7rem;color:var(--text-dim);margin-top:2px;}
+  @media (max-width:1250px){ .dash-topo{grid-template-columns:1fr;} .dash-cal{position:static;} }
   .decide-item:last-child{border-bottom:none;}
   .decide-item .obj{font-size:.76rem;}
   .decide-item .org{font-size:.7rem;color:var(--text-faint);margin-top:2px;}
@@ -354,7 +385,7 @@
     .panel-body table td{padding:8px 6px;}
     .panel-body table td.nowrap{white-space:normal;}
     .decide-item{grid-template-columns:78px 1fr;gap:8px;}
-    .decide-item .int-group{grid-column:1 / -1;justify-content:flex-end;}
+    .decide-item .val{grid-column:1 / -1;}
 
     .toolbar{display:grid;grid-template-columns:1fr 1fr;padding:12px;}
     .toolbar input[type=text]{grid-column:1 / -1;min-width:0;}
@@ -490,17 +521,32 @@
 
     <!-- DASHBOARD -->
     <section class="view" id="view-dashboard">
-      <div class="cards-row" id="dash-cards"></div>
-
-      <div class="dash-grid">
-        <div class="panel">
-          <div class="panel-head">Decidir agora <small>oportunidades sem decisão, por prazo</small></div>
-          <div class="panel-body" id="dash-decidir"></div>
+      <div class="dash-topo">
+        <div class="dash-main">
+          <div class="cards-row" id="dash-cards"></div>
+          <div class="dash-grid">
+            <div class="panel">
+              <div class="panel-head">Decidir agora <small>sem decisão, por prazo · clique para ver e decidir</small></div>
+              <div class="panel-body" id="dash-decidir"></div>
+            </div>
+            <div class="panel">
+              <div class="panel-head">Próximas sessões — vamos participar <small>interesse SIM</small></div>
+              <div class="panel-body" id="dash-proximas"></div>
+            </div>
+          </div>
         </div>
-        <div class="panel">
-          <div class="panel-head">Próximas sessões — vamos participar <small>interesse SIM</small></div>
-          <div class="panel-body" id="dash-proximas"></div>
-        </div>
+        <aside class="panel dash-cal">
+          <div class="cal-head">
+            <button class="icon-btn" data-cal="-1" title="Mês anterior" type="button">‹</button>
+            <b id="cal-titulo"></b>
+            <button class="icon-btn" data-cal="1" title="Próximo mês" type="button">›</button>
+            <button class="icon-btn" data-cal="0" title="Voltar para hoje" type="button">Hoje</button>
+          </div>
+          <div class="cal-grade" id="cal-grade"></div>
+          <div class="cal-leg"><span><i style="background:var(--warning)"></i>a decidir</span><span><i style="background:var(--accent)"></i>vamos participar</span></div>
+          <div class="cal-lista-titulo" id="cal-lista-titulo"></div>
+          <div class="cal-lista" id="cal-lista"></div>
+        </aside>
       </div>
 
       <div class="dash-grid">
@@ -1426,8 +1472,6 @@ function renderDashboard() {
   const simAndamento = sim.filter(l => !STATUS_FINAIS.includes(l.status));
   const semana = base.filter(l => (isPendente(l) || (isSim(l) && !STATUS_FINAIS.includes(l.status))) && (() => { const d = diasAte(l.dataSessao); return d !== null && d >= 0 && d <= 7; })());
   const valorDisputa = simAndamento.reduce((s, l) => s + (Number(l.valor) || 0), 0);
-  const ganhas = sim.filter(l => l.status === "GANHAMOS").length;
-  const perdidas = sim.filter(l => l.status === "PERDEMOS").length;
   const novas = pend.filter(l => meta && l.lote === meta.em).length;
 
   const cards = [
@@ -1435,7 +1479,6 @@ function renderDashboard() {
     { label: "Vamos participar", value: simAndamento.length, cls: "accent", sub: "interesse SIM em andamento", go: "sim" },
     { label: "Sessões em 7 dias", value: semana.length, cls: "", sub: "pendentes + vamos participar", go: "prazo7" },
     { label: "Valor em disputa", value: fmtMoneyCurto(valorDisputa), cls: "accent", sub: "soma das que vamos participar" },
-    { label: "Ganhamos", value: ganhas, cls: "lime", sub: `${perdidas} perdidas` },
   ];
   document.getElementById("dash-cards").innerHTML = cards.map(c => `
     <div class="card ${c.go ? "clickable" : ""}" ${c.go ? `data-go="${c.go}"` : ""}>
@@ -1446,26 +1489,13 @@ function renderDashboard() {
 
   // decidir agora
   const decidir = [...pend].sort((a, b) => (a.dataSessao || "9").localeCompare(b.dataSessao || "9")).slice(0, 10);
-  document.getElementById("dash-decidir").innerHTML = decidir.length ? decidir.map(l => `
-    <div class="decide-item" data-edit="${escapeHtml(l.id)}" title="Clique para ver os detalhes">
-      <div><div style="font-weight:600;font-size:.76rem;">${fmtDateTime(l.dataSessao).slice(0, 10)}</div>${prazoBadge(l)}</div>
-      <div>
-        <div class="obj clamp" style="-webkit-line-clamp:2;">${escapeHtml(l.objeto)}</div>
-        <div class="org">${escapeHtml(cidadeExibicao(l))} · ${escapeHtml(l.orgao)} · ${fmtMoney(l.valor) || "valor n/i"}</div>
-      </div>
-      ${interesseBotoes(l)}
-    </div>`).join("") + (pend.length > 10 ? `<div style="padding-top:10px;"><button class="btn btn-ghost btn-sm" data-go="pendentes">Ver todas as ${pend.length} pendentes →</button></div>` : "")
+  document.getElementById("dash-decidir").innerHTML = decidir.length ? decidir.map(itemDashHtml).join("") + (pend.length > 10 ? `<div style="padding-top:10px;"><button class="btn btn-ghost btn-sm" data-go="pendentes">Ver todas as ${pend.length} pendentes →</button></div>` : "")
     : `<div class="empty-state" style="padding:20px;">Nada pendente. ${meta ? "" : "Atualize do PNCP para ver as oportunidades."}</div>`;
 
   // próximas sessões SIM
   const prox = simAndamento.filter(l => { const d = diasAte(l.dataSessao); return d === null || d >= 0; })
     .sort((a, b) => (a.dataSessao || "9").localeCompare(b.dataSessao || "9")).slice(0, 10);
-  document.getElementById("dash-proximas").innerHTML = prox.length ? `<table><tbody>${prox.map(l => `
-    <tr data-edit="${escapeHtml(l.id)}" style="cursor:pointer;">
-      <td class="nowrap"><b>${fmtDateTime(l.dataSessao)}</b><div>${prazoBadge(l)}</div></td>
-      <td><div class="clamp" style="-webkit-line-clamp:2;">${escapeHtml(l.objeto)}</div><div class="muted small">${escapeHtml(cidadeExibicao(l))} · ${escapeHtml(l.orgao)}</div></td>
-      <td class="nowrap">${fmtMoney(l.valor)}</td>
-    </tr>`).join("")}</tbody></table>`
+  document.getElementById("dash-proximas").innerHTML = prox.length ? prox.map(itemDashHtml).join("")
     : `<div class="empty-state" style="padding:20px;">Marque SIM nas licitações em que vamos participar para elas aparecerem aqui.</div>`;
 
   const contar = (lista, fn) => { const m = new Map(); for (const l of lista) for (const k of [].concat(fn(l))) if (k) m.set(k, (m.get(k) || 0) + 1); return [...m.entries()].sort((a, b) => b[1] - a[1]); };
@@ -1477,8 +1507,72 @@ function renderDashboard() {
   const porCidade = new Map();
   for (const l of abertas) { const c = cidadeExibicao(l) || "—"; porCidade.set(c, (porCidade.get(c) || 0) + (Number(l.valor) || 0)); }
   barras("dash-cidades", [...porCidade.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10), fmtMoneyCurto);
+  calEventos = base.filter(l => l.dataSessao && (isPendente(l) || (isSim(l) && !STATUS_FINAIS.includes(l.status))));
+  renderCalendario();
   renderMapa();   // licitações SIM aparecem no mapa
 }
+
+// item das listas do painel: cidade em destaque, objeto embaixo e o valor à direita
+function itemDashHtml(l) {
+  const data = fmtDateTime(l.dataSessao);
+  return `<div class="decide-item" data-edit="${escapeHtml(l.id)}" title="Clique para ver os detalhes e decidir">
+      <div><div style="font-weight:600;font-size:.76rem;">${data.slice(0, 10) || "sem data"}</div>${data.length > 10 ? `<div class="muted small">${data.slice(11)}</div>` : ""}${prazoBadge(l)}</div>
+      <div style="min-width:0;">
+        <div class="cid">${escapeHtml(cidadeExibicao(l) || l.cidade || "Local a conferir")}</div>
+        <div class="obj clamp" style="-webkit-line-clamp:2;">${escapeHtml(l.objeto)}</div>
+        <div class="org">${escapeHtml(l.orgao || "")}</div>
+      </div>
+      <div class="val">${fmtMoney(l.valor) || `<small>valor n/i</small>`}</div>
+    </div>`;
+}
+
+/* ------------------------------ calendário de sessões ------------------------------ */
+let calEventos = [];
+let calMes = (() => { const d = new Date(); return new Date(d.getFullYear(), d.getMonth(), 1); })();
+let calDia = null;   // "AAAA-MM-DD" escolhido; null = mês inteiro
+const chaveDia = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+function renderCalendario() {
+  const grade = document.getElementById("cal-grade");
+  if (!grade) return;
+  const porDia = new Map();
+  for (const l of calEventos) { const k = l.dataSessao.slice(0, 10); if (!porDia.has(k)) porDia.set(k, []); porDia.get(k).push(l); }
+  document.getElementById("cal-titulo").textContent = calMes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const hoje = chaveDia(new Date());
+  const inicio = new Date(calMes); inicio.setDate(1 - calMes.getDay());   // começa no domingo
+  let html = ["D", "S", "T", "Q", "Q", "S", "S"].map(d => `<div class="cal-sem">${d}</div>`).join("");
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(inicio); d.setDate(inicio.getDate() + i);
+    if (i === 35 && d.getMonth() !== calMes.getMonth()) break;   // não sobra uma semana vazia
+    const k = chaveDia(d), evs = porDia.get(k) || [];
+    const pts = evs.slice(0, 4).map(l => `<i style="background:${isSim(l) ? "var(--accent)" : "var(--warning)"}"></i>`).join("");
+    const cls = [d.getMonth() !== calMes.getMonth() ? "fora" : "", evs.length ? "tem" : "", k === hoje ? "hoje" : "", k === calDia ? "sel" : ""].join(" ");
+    html += `<button type="button" class="cal-dia ${cls}" ${evs.length ? `data-dia="${k}" title="${evs.length} licitação(ões)"` : "disabled"}>${d.getDate()}<span class="pts">${pts}</span></button>`;
+  }
+  grade.innerHTML = html;
+
+  const doMes = calEventos.filter(l => l.dataSessao.slice(0, 7) === chaveDia(calMes).slice(0, 7));
+  const lista = (calDia ? porDia.get(calDia) || [] : doMes).slice().sort((a, b) => a.dataSessao.localeCompare(b.dataSessao));
+  document.getElementById("cal-lista-titulo").innerHTML = calDia
+    ? `<span>${new Date(calDia + "T12:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}</span><button class="icon-btn" data-cal-mes type="button">mês todo</button>`
+    : `<span>Sessões no mês (${doMes.length})</span>`;
+  document.getElementById("cal-lista").innerHTML = lista.length ? lista.map(l => `
+    <div class="cal-item ${isSim(l) ? "sim" : ""}" data-edit="${escapeHtml(l.id)}">
+      <div class="l1"><b>${escapeHtml(cidadeExibicao(l) || l.cidade || "Local a conferir")}</b><span class="nowrap">${l.valor > 0 ? fmtMoneyCurto(l.valor) : ""}</span></div>
+      <div class="obj clamp" style="-webkit-line-clamp:2;">${calDia ? fmtDateTime(l.dataSessao).slice(11) : fmtDateTime(l.dataSessao).slice(0, 5)} · ${escapeHtml(l.objeto)}</div>
+    </div>`).join("") : `<div class="muted small" style="padding:10px 0;">Nenhuma sessão ${calDia ? "neste dia" : "neste mês"}.</div>`;
+}
+document.querySelector(".dash-cal").addEventListener("click", e => {
+  const nav = e.target.closest("[data-cal]");
+  if (nav) {
+    const n = Number(nav.dataset.cal);
+    if (n === 0) { const d = new Date(); calMes = new Date(d.getFullYear(), d.getMonth(), 1); calDia = chaveDia(d); }
+    else { calMes = new Date(calMes.getFullYear(), calMes.getMonth() + n, 1); calDia = null; }
+    renderCalendario(); return;
+  }
+  const dia = e.target.closest("[data-dia]");
+  if (dia) { calDia = calDia === dia.dataset.dia ? null : dia.dataset.dia; renderCalendario(); return; }
+  if (e.target.closest("[data-cal-mes]")) { calDia = null; renderCalendario(); }
+});
 
 /* ------------------------------ tabela de controle ------------------------------ */
 function distinct(fn) { return [...new Set(licitacoes.map(fn).filter(Boolean))].sort((a, b) => a.localeCompare(b, "pt-BR")); }
