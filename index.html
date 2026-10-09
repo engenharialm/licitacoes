@@ -312,6 +312,34 @@
   .tab .count.alerta{background:#DC2626;color:#fff;}
   .badge.vencida{background:#FEE2E2;color:#B91C1C;}
   .cal-item.cert{border-left-color:#DC2626;}
+  /* atestados da LM */
+  .at-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:12px 6px;border-bottom:1px solid var(--border);border-radius:6px;cursor:pointer;}
+  .at-item:hover{background:var(--card-hover);}
+  .at-item .t1{font-weight:700;color:#0F2A3D;}
+  .at-item .t1 small{font-weight:500;color:var(--text-faint);margin-left:6px;}
+  .at-item .obj{font-size:.76rem;color:var(--text-dim);margin-top:2px;}
+  .at-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
+  .at-chip{font-size:.68rem;padding:2px 8px;border-radius:999px;background:var(--accent-dim);color:var(--accent);font-weight:600;white-space:nowrap;}
+  .at-chip.asf{background:#0F2A3D;color:#fff;}
+  .at-serv-cab, .at-serv{display:grid;grid-template-columns:minmax(0,1fr) 70px 120px 160px 34px;gap:6px;align-items:center;}
+  .at-serv-cab{font-size:.66rem;text-transform:uppercase;color:var(--text-faint);font-weight:700;margin-bottom:4px;}
+  .at-serv{margin-bottom:5px;}
+  .at-serv input, .at-serv select{width:100%;background:var(--bg);border:1px solid var(--border);border-radius:6px;padding:6px 8px;font-family:inherit;font-size:.76rem;color:var(--text);}
+  .at-serv button{height:30px;border:1px solid var(--border);background:transparent;border-radius:6px;cursor:pointer;color:var(--text-dim);}
+  .cmp{display:block;margin-top:6px;font-size:.74rem;font-weight:600;padding:5px 8px;border-radius:6px;}
+  .cmp.ok{background:rgba(77,124,15,.12);color:var(--lime);}
+  .cmp.soma{background:rgba(11,131,178,.12);color:var(--accent);}
+  .cmp.nao{background:rgba(220,38,38,.1);color:#B91C1C;}
+  .cmp.sem{background:#F1F5F9;color:var(--text-dim);font-weight:500;}
+  .atest-cmp{display:inline-block;margin-left:4px;font-size:.62rem;font-weight:700;padding:1px 6px;border-radius:999px;vertical-align:1px;}
+  .atest-cmp.ok{background:rgba(77,124,15,.15);color:var(--lime);}
+  .atest-cmp.soma{background:rgba(11,131,178,.15);color:var(--accent);}
+  .atest-cmp.nao{background:rgba(220,38,38,.12);color:#B91C1C;}
+  @media (max-width:720px){
+    .at-serv-cab{display:none;}
+    .at-serv{grid-template-columns:1fr 60px 90px;}
+    .at-serv select{grid-column:1 / 3;}
+  }
   .decide-item:last-child{border-bottom:none;}
   .decide-item .obj{font-size:.76rem;}
   .decide-item .org{font-size:.7rem;color:var(--text-faint);margin-top:2px;}
@@ -490,6 +518,7 @@
     <button class="tab" data-view="dashboard"><span class="t-longo">Dashboard</span><span class="t-curto">Painel</span></button>
     <button class="tab" data-view="controle"><span class="t-longo">Controle de licitações</span><span class="t-curto">Licitações</span> <span class="count" id="tab-count-controle">0</span></button>
     <button class="tab" data-view="ganhas"><span class="t-longo">Ganhas pela LM</span><span class="t-curto">Ganhas</span> <span class="count" id="tab-count-ganhas">0</span></button>
+    <button class="tab" data-view="atestados"><span class="t-longo">Atestados LM</span><span class="t-curto">Atestados</span> <span class="count" id="tab-count-atest">0</span></button>
     <button class="tab" data-view="certidoes"><span class="t-longo">Certidões</span><span class="t-curto">Certidões</span> <span class="count" id="tab-count-cert">0</span></button>
   </nav>
 
@@ -577,6 +606,29 @@
           <div class="panel-head">Cidades com maior valor em aberto</div>
           <div class="panel-body" id="dash-cidades"></div>
         </div>
+      </div>
+    </section>
+
+    <!-- ATESTADOS DA LM -->
+    <section class="view" id="view-atestados">
+      <div class="cards-row" id="at-cards"></div>
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-head">Acervo técnico por serviço <small>soma de todos os atestados · maior atestado sozinho</small></div>
+        <div class="table-wrap" style="max-height:none;">
+          <table class="tabela-cards">
+            <thead><tr><th>Serviço</th><th>Unidade</th><th>Soma do acervo</th><th>Maior atestado</th><th>Em quantos atestados</th></tr></thead>
+            <tbody id="at-acervo"></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">Atestados <small id="at-resumo"></small>
+          <span style="display:flex;gap:8px;flex-wrap:wrap;">
+            <input type="search" id="at-busca" placeholder="Buscar (CBUQ, Sete Lagoas, DNIT...)" style="border:1px solid var(--border);border-radius:8px;padding:6px 10px;font-family:inherit;min-width:220px;">
+            <button class="btn btn-ghost btn-sm" id="at-add" type="button">+ Novo atestado</button>
+          </span>
+        </div>
+        <div class="panel-body" id="at-lista"></div>
       </div>
     </section>
 
@@ -851,6 +903,96 @@
 <datalist id="dl-municipios"></datalist>
 
 <!-- MODAL: item da carteira (ganhas) -->
+<div class="modal-backdrop" id="modal-at">
+  <div class="modal" style="max-width:860px;">
+    <div class="modal-head">
+      <h2 id="at-m-titulo">Atestado</h2>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field">
+          <label>Contratante (quem atesta) *</label>
+          <input type="text" id="at-m-contratante">
+        </div>
+        <div class="field">
+          <label>Tipo</label>
+          <select id="at-m-tipo">
+            <option value="atestado">Atestado</option>
+            <option value="atestado_parcial">Atestado parcial</option>
+            <option value="cat">CAT (CREA)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Em nome de</label>
+          <select id="at-m-titular">
+            <option value="lm">LM (técnico-operacional)</option>
+            <option value="rt">Outra empresa — só acervo do RT (técnico-profissional)</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Entra na soma do acervo?</label>
+          <select id="at-m-somar">
+            <option value="sim">Sim</option>
+            <option value="nao">Não — repete outros atestados</option>
+          </select>
+        </div>
+        <div class="field full">
+          <label>Objeto</label>
+          <textarea id="at-m-objeto" rows="2"></textarea>
+        </div>
+        <div class="field">
+          <label>Cidade da obra</label>
+          <input type="text" id="at-m-municipio" list="dl-municipios">
+        </div>
+        <div class="field">
+          <label>Contrato</label>
+          <input type="text" id="at-m-contrato">
+        </div>
+        <div class="field">
+          <label>Início</label>
+          <input type="date" id="at-m-inicio">
+        </div>
+        <div class="field">
+          <label>Fim</label>
+          <input type="date" id="at-m-fim">
+        </div>
+        <div class="field">
+          <label>Valor (R$)</label>
+          <input type="number" id="at-m-valor" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label>Responsável técnico / CAT</label>
+          <input type="text" id="at-m-rt">
+        </div>
+        <div class="field full">
+          <label>Observação</label>
+          <textarea id="at-m-obs" rows="2"></textarea>
+        </div>
+        <div class="field full">
+          <label>Arquivo PDF</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="file" id="at-m-pdf" accept="application/pdf,.pdf" style="flex:1;min-width:200px;">
+            <button type="button" class="btn btn-ghost btn-sm" id="at-m-baixar" hidden>Baixar o atual</button>
+          </div>
+          <div class="muted small" id="at-m-pdf-info" style="margin-top:4px;"></div>
+        </div>
+      </div>
+      <div class="modal-section-title"><span>Serviços executados (quantidades do atestado)</span><span id="at-m-nserv"></span></div>
+      <div class="at-serv-cab"><span>Descrição</span><span>Un.</span><span>Quantidade</span><span>Serviço</span><span></span></div>
+      <div id="at-m-servicos"></div>
+      <button class="btn btn-ghost btn-sm" id="at-m-add-serv" type="button" style="margin-top:8px;width:100%;">+ Adicionar serviço</button>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger-ghost btn-sm" id="at-m-excluir" style="visibility:hidden;">Excluir</button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" data-close>Cancelar</button>
+        <button class="btn btn-accent" id="at-m-salvar">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-cert">
   <div class="modal" style="max-width:560px;">
     <div class="modal-head">
@@ -1476,9 +1618,10 @@ async function init() {
   carregarMapaGeo();
   try {
     let metaRegioes;
-    let metaCert;
-    [licitacoes, meta, metaAlerta, metaRegioes, ganhas, metaCert] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta"), store.getMeta("regioes"), storeGanhas.loadAll(), store.getMeta("certidoes"), carregarMunicipios()]);
+    let metaCert, metaAt;
+    [licitacoes, meta, metaAlerta, metaRegioes, ganhas, metaCert, metaAt] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta"), store.getMeta("regioes"), storeGanhas.loadAll(), store.getMeta("certidoes"), store.getMeta("atestados"), carregarMunicipios()]);
     certidoes = Array.isArray(metaCert?.lista) ? metaCert.lista : [];
+    atestados = Array.isArray(metaAt?.lista) ? metaAt.lista : [];
     if (metaRegioes && Array.isArray(metaRegioes.lista) && metaRegioes.lista.length) regioes = metaRegioes.lista;
     setConnStatus(true);
   } catch (e) {
@@ -1507,6 +1650,7 @@ function renderAll() {
   renderDashboard();
   renderTabela();
   renderGanhas();
+  renderAtestados();
   renderCertidoes();
 }
 
@@ -1765,8 +1909,11 @@ function atestadoCelula(l) {
   const linhas = linhasAtestado(l);
   if (!linhas.length) return `<span class="muted">—</span>`;
   const principal = linhas[indicePrincipal(linhas)];
+  // pior resultado entre as exigências com quantidade (uma que não atende já barra)
+  const cmps = linhas.map(compararExigencia).filter(c => c && c.curto);
+  const pior = cmps.find(c => c.cls === "nao") || cmps.find(c => c.cls === "soma") || cmps[0];
   return `<button class="atest-btn" data-atest="${escapeHtml(l.id)}" title="Clique para ver todos os atestados exigidos">
-    <span class="atest-label">Principal</span>
+    <span class="atest-label">Principal${pior ? ` <span class="atest-cmp ${pior.cls}" title="Comparado com o acervo da LM">${pior.curto}</span>` : ""}</span>
     <span class="atest-main">${escapeHtml(principal)}</span>
     ${linhas.length > 1 ? `<span class="atest-more">ver todos (${linhas.length}) →</span>` : `<span class="atest-more">detalhes →</span>`}
   </button>`;
@@ -1778,8 +1925,9 @@ function abrirAtestados(id) {
   const ip = indicePrincipal(linhas);
   document.getElementById("atest-sub").textContent = `${cidadeExibicao(l)} · ${l.orgao || ""} · ${l.numero || ""}`;
   document.getElementById("atest-lista").innerHTML = linhas.map((s, i) => `
-    <li class="${i === ip ? "principal" : ""}">${i === ip ? `<span class="badge accent">PRINCIPAL</span> ` : ""}${escapeHtml(s)}</li>`).join("");
-  document.getElementById("atest-nota").textContent = l.preenchidoAuto ? "Extraído do edital automaticamente — confira no edital antes de decidir." : "";
+    <li class="${i === ip ? "principal" : ""}">${i === ip ? `<span class="badge accent">PRINCIPAL</span> ` : ""}${escapeHtml(s)}${(c => c ? `<span class="cmp ${c.cls}">${escapeHtml(c.txt)}</span>` : "")(compararExigencia(s))}</li>`).join("");
+  document.getElementById("atest-nota").textContent = [l.preenchidoAuto ? "Extraído do edital automaticamente — confira no edital antes de decidir." : "",
+    atestados.length ? "Comparação automática com a aba Atestados LM (soma por tipo de serviço dentro de cada atestado). Confira as parcelas de maior relevância no edital." : ""].filter(Boolean).join(" ");
   document.getElementById("atest-editar").dataset.edit = l.id;
   document.getElementById("modal-atest").classList.add("open");
 }
@@ -2658,6 +2806,291 @@ function exportarExcel() {
   XLSX.writeFile(wb, `CONTROLE_LICITACOES_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.xlsx`);
 }
 
+/* ------------------------------ atestados da LM (acervo técnico) ------------------------------ */
+const CATEGORIAS_SERV = {
+  cbuq: "CBUQ / concreto asfáltico", pmf: "PMF (pré-misturado a frio)", tsd: "TSD / micro / lama asfáltica",
+  imprimacao: "Imprimação", pintura_ligacao: "Pintura de ligação", fresagem: "Fresagem",
+  base: "Base", sub_base: "Sub-base", regularizacao: "Regularização do subleito", terraplenagem: "Terraplenagem",
+  drenagem: "Drenagem", meio_fio: "Meio-fio", sinalizacao: "Sinalização", calcamento: "Calçamento / bloquete",
+  material_asfaltico: "Material asfáltico (CAP, emulsão)", outros: "Outros"
+};
+const CAT_ASFALTO = new Set(["cbuq", "pmf", "tsd", "imprimacao", "pintura_ligacao", "fresagem"]);
+const DENSIDADE = { cbuq: 2.4, pmf: 2.3 };   // t/m³, para comparar exigência em m³ com atestado em t (e vice-versa)
+const ARQ_PARTE = 600 * 1024;                // pedaço de PDF por documento do banco (base64 fica ~800 KB)
+const ATEST_PDF_MAX = 40 * 1024 * 1024;
+let atestados = [];
+let atEditId = null;
+
+// classifica um texto (item do atestado ou exigência do edital) num tipo de serviço
+function categoriaServico(txt) {
+  const s = norm(txt);
+  if (/sub.?base/.test(s)) return "sub_base";
+  if (/cbuq|cauq|concreto (betuminoso|asfaltico)|binder|usinado a quente|recapeamento|recape\b/.test(s)) return "cbuq";
+  if (/\bpmf\b|pre.?misturado/.test(s)) return "pmf";
+  if (/\btsd\b|\btss\b|\btst\b|tratamento superficial|micro.?revest|microrrevest|lama asfaltica/.test(s)) return "tsd";
+  if (/imprimacao|impermeabiliz/.test(s)) return "imprimacao";
+  if (/pintura de ligacao/.test(s)) return "pintura_ligacao";
+  if (/fresagem/.test(s)) return "fresagem";
+  if (/bloquete|paralelepipedo|intertravad|calcamento/.test(s)) return "calcamento";
+  if (/\bbase\b|brita graduada|\bbgs\b|solo.?brita|estabilizad/.test(s)) return "base";
+  if (/regulariza|subleito/.test(s)) return "regularizacao";
+  if (/meio.?fio|\bguia\b/.test(s)) return "meio_fio";
+  if (/sarjeta|bueiro|boca de lobo|poco de visita|galeria|\btubo|drenag|valeta|descida d/.test(s)) return "drenagem";
+  if (/escavacao|aterro|terraplen|\bcorte\b|carga e transporte|bota.?fora|empedramento/.test(s)) return "terraplenagem";
+  if (/sinaliza|defensa/.test(s)) return "sinalizacao";
+  if (/emulsao|\bcap\b|asfalto diluido|cm.?30|rr.?[12]c|rl.?1c/.test(s)) return "material_asfaltico";
+  if (/pavimenta/.test(s) && /asfalt/.test(s)) return "cbuq";
+  return "outros";
+}
+function normUnidade(u) {
+  const s = (u || "").toLowerCase().replace(/\s|\./g, "");
+  if (/^(t|ton|tons|tonelada|toneladas)$/.test(s)) return "t";
+  if (/^(m3|m³)$/.test(s)) return "m³";
+  if (/^(m2|m²)$/.test(s)) return "m²";
+  if (/^(m|ml|metro|metros)$/.test(s)) return "m";
+  if (/^(un|und|unid|unidade|unidades)$/.test(s)) return "un";
+  return s || "";
+}
+const fmtQtd = n => (Number(n) || 0).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+// quantidade de um serviço na unidade pedida (CBUQ/PMF: converte t ↔ m³ pela densidade)
+function qtdNaUnidade(s, unidade) {
+  const u = normUnidade(s.unidade), q = Number(s.quantidade) || 0;
+  if (u === unidade) return { q, conv: false };
+  if (u === "km" && unidade === "m") return { q: q * 1000, conv: false };
+  const d = DENSIDADE[s.categoria];
+  if (d && u === "t" && unidade === "m³") return { q: q / d, conv: true };
+  if (d && u === "m³" && unidade === "t") return { q: q * d, conv: true };
+  return null;
+}
+// documento que só repete outros (ex.: certidão de acervo geral do CREA) fica fora da soma;
+// atestado em nome de outra empresa vale só como acervo do responsável técnico (técnico-profissional)
+const atestadosValidos = (titular = "lm") => atestados.filter(a => a.somar !== false && (a.titular || "lm") === titular);
+// dentro de drenagem, terraplenagem e sinalização só vale serviço da mesma família (sarjeta ≠ tubo)
+const FAMILIAS_SERV = [/sarjeta|valeta/, /\btubo|bueiro|galeria|manilha/, /boca de lobo|poco de visita|caixa coletora|caixa de passagem/,
+  /3.? categoria|rocha/, /empedramento|rachao/, /escavac|\bcorte\b/, /aterro/, /defensa/, /placa|sinalizacao vertical/, /sinalizacao horizontal|pintura de faixa|tinta/];
+function familiaDe(txt) { const s = norm(txt); return FAMILIAS_SERV.find(rx => rx.test(s)) || null; }
+function acervoPara(categoria, unidade, titular = "lm", familia = null) {
+  let soma = 0, maior = 0, maiorAt = null, maiorConv = false, conv = false, n = 0;
+  for (const a of atestadosValidos(titular)) {
+    let tot = 0, convAt = false;
+    for (const s of a.servicos || []) {
+      if (s.categoria !== categoria) continue;
+      if (familia && !familia.test(norm(s.descricao))) continue;
+      const r = qtdNaUnidade(s, unidade);
+      if (!r) continue;
+      tot += r.q; convAt = convAt || r.conv;
+    }
+    if (tot > 0) { n++; soma += tot; conv = conv || convAt; if (tot > maior) { maior = tot; maiorAt = a; maiorConv = convAt; } }
+  }
+  return { soma, maior, maiorAt, conv, maiorConv, n };
+}
+// lê "Concreto asfáltico faixa C - 547,50 t (50% de 1.094,99 t)" e compara com o acervo
+const RX_EXIGENCIA = /(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?)\s*(m²|m2|m³|m3|toneladas|ton|t|km|m|un)(?![\wÀ-ú²³])/i;
+function compararExigencia(linha) {
+  if (!atestados.length) return null;
+  const m = linha.match(RX_EXIGENCIA);
+  if (!m) return null;
+  const qtd = Number(m[1].replace(/\./g, "").replace(",", "."));
+  const unidade = normUnidade(m[2]);
+  const categoria = categoriaServico(linha.slice(0, m.index) || linha);
+  if (!(qtd > 0) || categoria === "outros") return null;
+  const desc = linha.slice(0, m.index) || linha;
+  const familia = ["drenagem", "terraplenagem", "sinalizacao"].includes(categoria) ? familiaDe(desc) : null;
+  const ac = acervoPara(categoria, unidade, "lm", familia);
+  const nome = familia ? desc.replace(/^[^:]*:\s*/, "").split(/ - |,/)[0].trim().slice(0, 40).toLowerCase() : CATEGORIAS_SERV[categoria].split(" (")[0];
+  const txtConv = ` · convertido a ${String(DENSIDADE[categoria]).replace(".", ",")} t/m³`;
+  // acervo do RT em atestados de outra empresa: só ajuda no técnico-profissional
+  const rt = acervoPara(categoria, unidade, "rt", familia);
+  const notaRt = rt.maior >= qtd ? ` · O RT tem CAT (em outra empresa) com ${fmtQtd(rt.maior)} ${unidade}: serve só para o técnico-profissional` : "";
+  const conv = ac.conv ? txtConv : "";
+  if (ac.maior >= qtd) return { cls: "ok", curto: "✓ atende", txt: `✓ Atende com 1 atestado: ${ac.maiorAt.contratante} — ${fmtQtd(ac.maior)} ${unidade} de ${nome}${ac.maiorConv ? txtConv : ""}` };
+  if (ac.soma >= qtd) return { cls: "soma", curto: "Σ somando", txt: `Σ Atende somando ${ac.n} atestados (${fmtQtd(ac.soma)} ${unidade}). Maior sozinho: ${fmtQtd(ac.maior)} ${unidade}. Confira se o edital aceita somatório${conv}${notaRt}` };
+  if (!ac.n) return { cls: "sem", curto: "", txt: `Sem atestado de ${nome} em ${unidade} em nome da LM${notaRt}` };
+  return { cls: "nao", curto: "✗ não atende", txt: `✗ Não atende: maior atestado ${fmtQtd(ac.maior)} ${unidade}, soma ${fmtQtd(ac.soma)} ${unidade} (exigido ${fmtQtd(qtd)} ${unidade})${conv}${notaRt}` };
+}
+
+// PDF grande dividido em vários documentos do banco
+function bytesParaBase64(u8) {
+  let s = "";
+  for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+async function salvarArquivoPartes(prefixo, arquivo, progresso) {
+  const bytes = new Uint8Array(await arquivo.arrayBuffer());
+  const partes = Math.ceil(bytes.length / ARQ_PARTE);
+  for (let i = 0; i < partes; i++) {
+    await store.setMeta({ base64: bytesParaBase64(bytes.subarray(i * ARQ_PARTE, (i + 1) * ARQ_PARTE)), parte: i, de: partes }, `${prefixo}-${i}`);
+    progresso?.(i + 1, partes);
+  }
+  return partes;
+}
+async function lerArquivoPartes(prefixo, partes) {
+  const docs = await Promise.all(Array.from({ length: partes }, (_, i) => store.getMeta(`${prefixo}-${i}`)));
+  if (docs.some(d => !d?.base64)) throw new Error("Arquivo incompleto no banco. Anexe o PDF de novo.");
+  return new Blob(docs.map(d => base64ParaBytes(d.base64)), { type: "application/pdf" });
+}
+
+// no resumo e no acervo só entram unidades de quantidade (transporte t×km, horas, meses ficam de fora)
+const UNIDADES_ACERVO = new Set(["t", "m³", "m²", "m", "km", "un"]);
+function resumoServicos(a) {
+  const m = new Map();
+  for (const s of a.servicos || []) {
+    if (!UNIDADES_ACERVO.has(normUnidade(s.unidade))) continue;
+    const k = s.categoria + "|" + normUnidade(s.unidade);
+    m.set(k, (m.get(k) || 0) + (Number(s.quantidade) || 0));
+  }
+  const ordem = Object.keys(CATEGORIAS_SERV);
+  return [...m.entries()].map(([k, q]) => { const [c, u] = k.split("|"); return { c, u, q }; })
+    .filter(x => x.q > 0 && x.c !== "outros")
+    .sort((x, y) => ordem.indexOf(x.c) - ordem.indexOf(y.c) || y.q - x.q);
+}
+const periodoAt = a => a.inicio || a.fim ? `${fmtData(a.inicio)} a ${fmtData(a.fim)}` : "";
+
+function renderAtestados() {
+  const validos = atestadosValidos();
+  document.getElementById("tab-count-atest").textContent = atestados.length;
+  // acervo por serviço
+  const grupos = new Map();
+  for (const a of validos) for (const x of resumoServicos(a)) {
+    const k = x.c + "|" + x.u;
+    if (!grupos.has(k)) grupos.set(k, { c: x.c, u: x.u, soma: 0, maior: 0, maiorAt: null, n: 0 });
+    const g = grupos.get(k);
+    g.soma += x.q; g.n++;
+    if (x.q > g.maior) { g.maior = x.q; g.maiorAt = a; }
+  }
+  const ordem = Object.keys(CATEGORIAS_SERV);
+  const linhas = [...grupos.values()].sort((x, y) => ordem.indexOf(x.c) - ordem.indexOf(y.c) || y.soma - x.soma);
+  const destaque = (c, u) => grupos.get(c + "|" + u);
+  const card = (label, c, u) => { const g = destaque(c, u); return { label, value: g ? `${fmtQtd(g.soma)} ${u}` : "—", sub: g ? `maior: ${fmtQtd(g.maior)} ${u} · ${g.n} atestado(s)` : "sem atestado" }; };
+  document.getElementById("at-cards").innerHTML = [
+    { label: "Atestados em nome da LM", value: validos.length, sub: atestados.length > validos.length ? `+ ${atestados.length - validos.length} fora da soma (do RT ou repetidos)` : "no acervo da LM" },
+    (c => { const g3 = destaque("cbuq", "m³"); if (g3) c.sub += ` · + ${fmtQtd(g3.soma)} m³ em atestados em m³`; return c; })(card("CBUQ", "cbuq", "t")),
+    card("PMF", "pmf", "m³"), card("Imprimação", "imprimacao", "m²"), card("Base", "base", "m³")
+  ].map(c => `<div class="card"><div class="label">${c.label}</div><div class="value">${c.value}</div><div class="sub">${c.sub}</div></div>`).join("");
+  const tb = document.getElementById("at-acervo");
+  tb.innerHTML = linhas.length ? linhas.map(g => `<tr>
+      <td><b>${escapeHtml(CATEGORIAS_SERV[g.c])}</b></td><td>${escapeHtml(g.u)}</td>
+      <td class="nowrap"><b>${fmtQtd(g.soma)}</b></td>
+      <td>${fmtQtd(g.maior)} <span class="muted small">· ${escapeHtml(g.maiorAt?.contratante || "")}</span></td>
+      <td>${g.n}</td></tr>`).join("") : `<tr><td colspan="5"><div class="empty-state">Nenhum atestado cadastrado ainda.</div></td></tr>`;
+  rotularTabela(tb);
+
+  // lista
+  const busca = norm(document.getElementById("at-busca").value.trim());
+  const lista = atestados.filter(a => !busca || norm([a.contratante, a.municipio, a.objeto, a.obs, ...(a.servicos || []).map(s => s.descricao)].join(" ")).includes(busca))
+    .sort((a, b) => (a.somar === false) - (b.somar === false) || (b.fim || b.inicio || "").localeCompare(a.fim || a.inicio || ""));
+  document.getElementById("at-resumo").textContent = busca ? `${lista.length} de ${atestados.length}` : "";
+  document.getElementById("at-lista").innerHTML = lista.length ? lista.map(a => `
+    <div class="at-item" data-at="${escapeHtml(a.id)}" title="Clique para ver todos os serviços">
+      <div style="min-width:0;">
+        <div class="t1">${escapeHtml(a.contratante || "—")}<small>${escapeHtml([a.municipio, periodoAt(a), a.tipoDoc === "atestado_parcial" ? "PARCIAL" : a.tipoDoc === "cat" ? "CAT" : "", a.somar === false ? "fora da soma" : "", a.titular === "rt" ? "SÓ ACERVO DO RT (outra empresa)" : ""].filter(Boolean).join(" · "))}</small></div>
+        <div class="obj clamp" style="-webkit-line-clamp:2;">${escapeHtml(a.objeto || "")}</div>
+        <div class="at-chips">${resumoServicos(a).slice(0, 8).map(x => `<span class="at-chip ${CAT_ASFALTO.has(x.c) ? "asf" : ""}">${escapeHtml(CATEGORIAS_SERV[x.c].split(" (")[0].split(" /")[0])} ${fmtQtd(x.q)} ${escapeHtml(x.u)}</span>`).join("")}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
+        ${a.valor > 0 ? `<b class="nowrap" style="font-size:.8rem;">${fmtMoneyCurto(a.valor)}</b>` : ""}
+        ${a.arquivoNome ? `<button class="icon-btn" data-at-pdf="${escapeHtml(a.id)}" title="${escapeHtml(a.arquivoNome)}">Baixar PDF</button>` : `<span class="muted small">sem PDF</span>`}
+      </div>
+    </div>`).join("") : `<div class="empty-state" style="padding:20px;">${atestados.length ? "Nenhum atestado com essa busca." : "Nenhum atestado cadastrado. Clique em + Novo atestado."}</div>`;
+}
+
+function atServRowHtml(s = {}) {
+  return `<div class="at-serv">
+    <input class="as-desc" value="${escapeHtml(s.descricao || "")}" placeholder="Descrição do serviço">
+    <input class="as-un" value="${escapeHtml(s.unidade || "")}" placeholder="t, m³…">
+    <input class="as-qtd" type="number" step="0.01" value="${s.quantidade ?? ""}">
+    <select class="as-cat">${Object.entries(CATEGORIAS_SERV).map(([k, v]) => `<option value="${k}" ${k === (s.categoria || "outros") ? "selected" : ""}>${escapeHtml(v)}</option>`).join("")}</select>
+    <button type="button" class="as-del" title="Remover">✕</button>
+  </div>`;
+}
+function abrirAtestadoLm(id) {
+  atEditId = id || null;
+  const a = id ? atestados.find(x => x.id === id) : { tipoDoc: "atestado", servicos: [] };
+  if (!a) return;
+  const v = (campo, val) => { document.getElementById(campo).value = val ?? ""; };
+  document.getElementById("at-m-titulo").textContent = id ? a.contratante || "Atestado" : "Novo atestado";
+  v("at-m-contratante", a.contratante); v("at-m-tipo", a.tipoDoc || "atestado"); v("at-m-objeto", a.objeto);
+  v("at-m-somar", a.somar === false ? "nao" : "sim");
+  v("at-m-titular", a.titular || "lm");
+  v("at-m-municipio", a.municipio); v("at-m-contrato", a.contrato); v("at-m-inicio", a.inicio); v("at-m-fim", a.fim);
+  v("at-m-valor", a.valor); v("at-m-rt", [a.responsavelTecnico, a.crea].filter(Boolean).join(" · ")); v("at-m-obs", a.obs);
+  document.getElementById("at-m-pdf").value = "";
+  document.getElementById("at-m-baixar").hidden = !a.arquivoNome;
+  document.getElementById("at-m-pdf-info").textContent = a.arquivoNome ? `Arquivo atual: ${a.arquivoNome} (${(a.arquivoTam / 1048576).toFixed(1).replace(".", ",")} MB)` : "Nenhum PDF anexado.";
+  document.getElementById("at-m-servicos").innerHTML = (a.servicos?.length ? a.servicos : [{}]).map(atServRowHtml).join("");
+  document.getElementById("at-m-nserv").textContent = a.servicos?.length ? `${a.servicos.length} itens` : "";
+  document.getElementById("at-m-excluir").style.visibility = id ? "visible" : "hidden";
+  document.getElementById("modal-at").classList.add("open");
+}
+async function gravarAtestados(lista) {
+  await store.setMeta({ lista, atualizadoEm: new Date().toISOString() }, "atestados");
+  atestados = lista;
+  renderAtestados();
+  renderTabela();   // o "atende / não atende" das licitações muda junto
+}
+async function salvarAtestadoLm() {
+  const contratante = document.getElementById("at-m-contratante").value.trim();
+  if (!contratante) { toast("Preencha o contratante.", true); return; }
+  if (!requireUnlock()) return;
+  const g = id => document.getElementById(id).value.trim();
+  const anterior = atestados.find(a => a.id === atEditId) || {};
+  const rt = g("at-m-rt");
+  const dados = {
+    ...anterior,
+    id: atEditId || "atest-" + Date.now().toString(36),
+    contratante, tipoDoc: g("at-m-tipo"), somar: g("at-m-somar") !== "nao", titular: g("at-m-titular"), objeto: g("at-m-objeto"), municipio: g("at-m-municipio"),
+    contrato: g("at-m-contrato"), inicio: g("at-m-inicio"), fim: g("at-m-fim"),
+    valor: g("at-m-valor") === "" ? null : Number(g("at-m-valor")),
+    responsavelTecnico: rt, crea: "", obs: g("at-m-obs"),
+    servicos: [...document.querySelectorAll("#at-m-servicos .at-serv")].map(r => ({
+      descricao: r.querySelector(".as-desc").value.trim(), unidade: normUnidade(r.querySelector(".as-un").value),
+      quantidade: r.querySelector(".as-qtd").value === "" ? null : Number(r.querySelector(".as-qtd").value),
+      categoria: r.querySelector(".as-cat").value
+    })).filter(s => s.descricao || s.quantidade)
+  };
+  const arquivo = document.getElementById("at-m-pdf").files[0];
+  const btn = document.getElementById("at-m-salvar");
+  try {
+    if (arquivo) {
+      if (arquivo.size > ATEST_PDF_MAX) { toast("PDF acima de 40 MB.", true); return; }
+      btn.disabled = true;
+      dados.arquivoPartes = await salvarArquivoPartes("atestpdf-" + dados.id, arquivo, (i, n) => { btn.textContent = `Enviando PDF ${i}/${n}…`; });
+      dados.arquivoNome = arquivo.name; dados.arquivoTam = arquivo.size;
+    }
+    await gravarAtestados(atEditId ? atestados.map(a => a.id === atEditId ? dados : a) : [...atestados, dados]);
+    document.getElementById("modal-at").classList.remove("open");
+    toast("Atestado salvo.");
+  } catch (e) { toast(e.message || "Erro ao salvar.", true); }
+  btn.disabled = false; btn.textContent = "Salvar";
+}
+async function excluirAtestadoLm() {
+  if (!atEditId || !confirm("Excluir este atestado do acervo?") || !requireUnlock()) return;
+  try {
+    await gravarAtestados(atestados.filter(a => a.id !== atEditId));
+    document.getElementById("modal-at").classList.remove("open");
+  } catch (e) { toast(e.message || "Erro ao excluir.", true); }
+}
+async function baixarPdfAtestado(id) {
+  const a = atestados.find(x => x.id === id);
+  if (!a?.arquivoPartes) return;
+  toast(`Baixando ${a.arquivoNome}…`);
+  try { salvarBlob(await lerArquivoPartes("atestpdf-" + a.id, a.arquivoPartes), a.arquivoNome); }
+  catch (e) { toast(e.message || "Erro ao baixar.", true); }
+}
+document.getElementById("at-add").addEventListener("click", () => abrirAtestadoLm(null));
+document.getElementById("at-busca").addEventListener("input", renderAtestados);
+document.getElementById("at-m-salvar").addEventListener("click", salvarAtestadoLm);
+document.getElementById("at-m-excluir").addEventListener("click", excluirAtestadoLm);
+document.getElementById("at-m-baixar").addEventListener("click", () => { if (atEditId) baixarPdfAtestado(atEditId); });
+document.getElementById("at-m-add-serv").addEventListener("click", () => document.getElementById("at-m-servicos").insertAdjacentHTML("beforeend", atServRowHtml()));
+document.getElementById("at-m-servicos").addEventListener("click", e => { if (e.target.closest(".as-del")) e.target.closest(".at-serv").remove(); });
+// ao digitar a descrição de um item novo, sugere o tipo de serviço
+document.getElementById("at-m-servicos").addEventListener("change", e => {
+  if (!e.target.classList.contains("as-desc")) return;
+  const sel = e.target.closest(".at-serv").querySelector(".as-cat");
+  if (sel.value === "outros") sel.value = categoriaServico(e.target.value);
+});
+
 /* ------------------------------ certidões ------------------------------ */
 const CERT_AVISO_DIAS = 15;
 const CERT_PDF_MAX = 700 * 1024;   // o documento do banco aceita até ~1 MB; o PDF vai em base64 (+33%)
@@ -3402,6 +3835,10 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
 document.addEventListener("click", e => {
   const intBtn = e.target.closest(".int-btn[data-int]");
   if (intBtn) { setInteresse(intBtn.dataset.id, intBtn.dataset.int); return; }
+  const atPdf = e.target.closest("[data-at-pdf]");
+  if (atPdf) { baixarPdfAtestado(atPdf.dataset.atPdf); return; }
+  const atItem = e.target.closest("[data-at]");
+  if (atItem && !String(window.getSelection()).trim()) { abrirAtestadoLm(atItem.dataset.at); return; }
   const certPdf = e.target.closest("[data-cert-pdf]");
   if (certPdf) { baixarPdfCert(certPdf.dataset.certPdf); return; }
   const cert = e.target.closest("[data-cert]");
