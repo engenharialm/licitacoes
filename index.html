@@ -585,7 +585,10 @@
       <div class="cards-row" id="cert-cards"></div>
       <div class="panel">
         <div class="panel-head">Certidões de habilitação <small>o portal avisa 15 dias antes do vencimento</small>
-          <button class="btn btn-ghost btn-sm" id="cert-add" type="button">+ Nova certidão</button>
+          <span style="display:flex;gap:8px;">
+            <button class="btn btn-ghost btn-sm" id="cert-zip" type="button" title="Todas as certidões em PDF num arquivo .zip">Baixar todas (.zip)</button>
+            <button class="btn btn-ghost btn-sm" id="cert-add" type="button">+ Nova certidão</button>
+          </span>
         </div>
         <div class="table-wrap" style="max-height:none;">
           <table class="tabela-cards">
@@ -878,7 +881,15 @@
           <div class="muted small" id="cert-m-dica" style="margin-top:4px;"></div>
         </div>
         <div class="field full">
-          <label>Link do arquivo (OneDrive, Drive...) ou site para emitir</label>
+          <label>Arquivo PDF da certidão</label>
+          <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+            <input type="file" id="cert-m-pdf" accept="application/pdf,.pdf" style="flex:1;min-width:200px;">
+            <button type="button" class="btn btn-ghost btn-sm" id="cert-m-baixar" hidden>Baixar o atual</button>
+          </div>
+          <div class="muted small" id="cert-m-pdf-info" style="margin-top:4px;"></div>
+        </div>
+        <div class="field full">
+          <label>Link (site para emitir, OneDrive...)</label>
           <input type="text" id="cert-m-link" placeholder="https://...">
         </div>
         <div class="field full">
@@ -2649,6 +2660,7 @@ function exportarExcel() {
 
 /* ------------------------------ certidões ------------------------------ */
 const CERT_AVISO_DIAS = 15;
+const CERT_PDF_MAX = 700 * 1024;   // o documento do banco aceita até ~1 MB; o PDF vai em base64 (+33%)
 // validade usual de cada certidão, para sugerir a data quando só a emissão é preenchida
 const TIPOS_CERT = {
   federal:     { nome: "CND Federal (Receita / PGFN)", orgao: "Receita Federal / PGFN", dias: 180 },
@@ -2710,7 +2722,7 @@ function renderCertidoes() {
       <td class="nowrap">${fmtData(c.emissao)}</td>
       <td class="nowrap"><b>${fmtData(c.validade)}</b></td>
       <td><span class="badge ${s.cls}">${s.txt}</span></td>
-      <td>${safeUrl(c.link) ? `<a class="icon-btn" href="${escapeHtml(c.link)}" target="_blank" rel="noopener">Abrir</a>` : `<span class="muted small">—</span>`}</td>
+      <td><div class="row-actions">${c.arquivoNome ? `<button class="icon-btn" data-cert-pdf="${escapeHtml(c.id)}" title="${escapeHtml(c.arquivoNome)}">Baixar PDF</button>` : ""}${safeUrl(c.link) ? `<a class="icon-btn" href="${escapeHtml(c.link)}" target="_blank" rel="noopener">Link</a>` : ""}${!c.arquivoNome && !safeUrl(c.link) ? `<span class="muted small">sem PDF</span>` : ""}</div></td>
       <td class="no-print"><button class="icon-btn" data-cert="${escapeHtml(c.id)}">Editar</button></td>
     </tr>`;
   }).join("") : `<tr><td colspan="7"><div class="empty-state">Nenhuma certidão cadastrada. Clique em <b>+ Nova certidão</b>.</div></td></tr>`;
@@ -2743,6 +2755,11 @@ function abrirCertidao(id) {
   document.getElementById("cert-m-validade").value = c.validade || "";
   document.getElementById("cert-m-link").value = c.link || "";
   document.getElementById("cert-m-obs").value = c.obs || "";
+  document.getElementById("cert-m-pdf").value = "";
+  document.getElementById("cert-m-baixar").hidden = !c.arquivoNome;
+  document.getElementById("cert-m-pdf-info").textContent = c.arquivoNome
+    ? `Arquivo atual: ${c.arquivoNome} (${Math.round((c.arquivoTam || 0) / 1024)} KB). Escolha outro para substituir ao renovar.`
+    : `Nenhum PDF anexado (até ${CERT_PDF_MAX / 1024} KB).`;
   document.getElementById("cert-m-excluir").style.visibility = id ? "visible" : "hidden";
   certValidadeAuto = false;
   sugerirValidade();
@@ -2758,15 +2775,32 @@ async function salvarCertidao() {
   const validade = document.getElementById("cert-m-validade").value;
   if (!nome || !validade) { toast("Preencha o nome e a data de validade.", true); return; }
   if (!requireUnlock()) return;
+  const anterior = certidoes.find(c => c.id === certEditId) || {};
   const dados = {
     id: certEditId || "cert-" + Date.now().toString(36),
     tipo: document.getElementById("cert-m-tipo").value, nome,
     orgao: document.getElementById("cert-m-orgao").value.trim(),
     emissao: document.getElementById("cert-m-emissao").value, validade,
     link: document.getElementById("cert-m-link").value.trim(),
-    obs: document.getElementById("cert-m-obs").value.trim()
+    obs: document.getElementById("cert-m-obs").value.trim(),
+    arquivoNome: anterior.arquivoNome || "", arquivoTam: anterior.arquivoTam || 0
   };
+  const arquivo = document.getElementById("cert-m-pdf").files[0];
   try {
+    if (arquivo) {
+      if (!/\.pdf$/i.test(arquivo.name) && arquivo.type !== "application/pdf") { toast("Escolha um arquivo PDF.", true); return; }
+      if (arquivo.size > CERT_PDF_MAX) { toast(`PDF muito grande (${Math.round(arquivo.size / 1024)} KB). O limite é ${CERT_PDF_MAX / 1024} KB.`, true); return; }
+      const base64 = await new Promise((ok, erro) => {
+        const r = new FileReader();
+        r.onload = () => ok(String(r.result).split(",")[1]);
+        r.onerror = () => erro(new Error("Não foi possível ler o PDF."));
+        r.readAsDataURL(arquivo);
+      });
+      // o PDF fica num documento à parte: a lista de certidões continua leve
+      await store.setMeta({ nome: arquivo.name, base64, enviadoEm: new Date().toISOString() }, "certpdf-" + dados.id);
+      dados.arquivoNome = arquivo.name;
+      dados.arquivoTam = arquivo.size;
+    }
     await gravarCertidoes(certEditId ? certidoes.map(c => c.id === certEditId ? dados : c) : [...certidoes, dados]);
     document.getElementById("modal-cert").classList.remove("open");
     toast("Certidão salva.");
@@ -2779,6 +2813,49 @@ async function excluirCertidao() {
     document.getElementById("modal-cert").classList.remove("open");
   } catch (e) { toast(e.message || "Erro ao excluir.", true); }
 }
+// nome do arquivo baixado: "CND Federal (Receita - PGFN) - valida ate 24-01-2027.pdf"
+function nomeArquivoCert(c) {
+  return `${c.nome} - valida ate ${fmtData(c.validade).replace(/\//g, "-")}.pdf`.replace(/[\\/:*?"<>|]+/g, "-");
+}
+function salvarBlob(blob, nome) {
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+}
+const base64ParaBytes = b64 => Uint8Array.from(atob(b64), ch => ch.charCodeAt(0));
+async function baixarPdfCert(id) {
+  const c = certidoes.find(x => x.id === id);
+  if (!c) return;
+  try {
+    const arq = await store.getMeta("certpdf-" + id);
+    if (!arq?.base64) { toast("PDF não encontrado. Anexe de novo na certidão.", true); return; }
+    salvarBlob(new Blob([base64ParaBytes(arq.base64)], { type: "application/pdf" }), nomeArquivoCert(c));
+  } catch (e) { toast(e.message || "Erro ao baixar o PDF.", true); }
+}
+async function baixarTodasCert() {
+  const comPdf = certidoes.filter(c => c.arquivoNome);
+  if (!comPdf.length) { toast("Nenhuma certidão com PDF anexado.", true); return; }
+  const btn = document.getElementById("cert-zip");
+  btn.disabled = true; btn.textContent = "Montando .zip…";
+  try {
+    if (!window.JSZip) await new Promise((ok, erro) => {
+      const s = document.createElement("script");
+      s.src = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+      s.onload = ok; s.onerror = () => erro(new Error("Não foi possível carregar o gerador de .zip."));
+      document.head.appendChild(s);
+    });
+    const zip = new JSZip();
+    const arqs = await Promise.all(comPdf.map(c => store.getMeta("certpdf-" + c.id)));
+    comPdf.forEach((c, i) => { if (arqs[i]?.base64) zip.file(nomeArquivoCert(c), base64ParaBytes(arqs[i].base64)); });
+    const hoje = fmtData(chaveDia(new Date())).replace(/\//g, "-");
+    salvarBlob(await zip.generateAsync({ type: "blob" }), `Certidoes LM ${hoje}.zip`);
+  } catch (e) { toast(e.message || "Erro ao montar o .zip.", true); }
+  btn.disabled = false; btn.textContent = "Baixar todas (.zip)";
+}
+document.getElementById("cert-zip").addEventListener("click", baixarTodasCert);
+document.getElementById("cert-m-baixar").addEventListener("click", () => { if (certEditId) baixarPdfCert(certEditId); });
 document.getElementById("cert-add").addEventListener("click", () => abrirCertidao(null));
 document.getElementById("cert-m-salvar").addEventListener("click", salvarCertidao);
 document.getElementById("cert-m-excluir").addEventListener("click", excluirCertidao);
@@ -3325,6 +3402,8 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
 document.addEventListener("click", e => {
   const intBtn = e.target.closest(".int-btn[data-int]");
   if (intBtn) { setInteresse(intBtn.dataset.id, intBtn.dataset.int); return; }
+  const certPdf = e.target.closest("[data-cert-pdf]");
+  if (certPdf) { baixarPdfCert(certPdf.dataset.certPdf); return; }
   const cert = e.target.closest("[data-cert]");
   if (cert && !(cert.tagName === "TR" && e.target.closest("a[href]"))) { abrirCertidao(cert.dataset.cert); return; }
   const ganCard = e.target.closest("[data-gan-card]");
