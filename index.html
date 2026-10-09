@@ -2339,7 +2339,7 @@ const BASES_LM = [
 const CAMADAS = {
   obra:    { nome: "Obras (contratos ganhos)", cor: "#4D7C0F" },
   disputa: { nome: "Em análise / em andamento", cor: "#0B83B2" },
-  sim:     { nome: "Licitações com interesse SIM", cor: "#D97706" },
+  sim:     { nome: "Licitações com interesse", cor: "#D97706" },
   usina:   { nome: "Usinas de asfalto", cor: "#1F2937" },
   escr:    { nome: "Escritórios", cor: "#64748B" }
 };
@@ -2426,7 +2426,7 @@ function renderMapa() {
   document.getElementById("mapa-cards").innerHTML = [
     { label: "Obras no mapa", value: doTipo("obra").length, sub: fmtMoneyCurto(soma(doTipo("obra"))), cls: "lime" },
     { label: "Em disputa", value: doTipo("disputa").length, sub: fmtMoneyCurto(soma(doTipo("disputa"))), cls: "accent" },
-    { label: "Interesse SIM", value: doTipo("sim").length, sub: "licitações a disputar", cls: "warn" },
+    { label: "Com interesse", value: doTipo("sim").length, sub: "licitações a disputar", cls: "warn" },
     { label: "Bases em MG", value: bases.length, sub: `${bases.filter(b => b.usina).length} usinas · ${bases.filter(b => b.escr).length} escritórios`, cls: "" }
   ].map(c => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls}">${c.value}</div><div class="sub">${c.sub}</div></div>`).join("");
 
