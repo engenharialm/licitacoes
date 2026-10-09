@@ -2862,14 +2862,18 @@ function qtdNaUnidade(s, unidade) {
   const d = DENSIDADE[s.categoria];
   if (d && u === "t" && unidade === "m³") return { q: q / d, conv: true };
   if (d && u === "m³" && unidade === "t") return { q: q * d, conv: true };
+  // pintura de faixa em m² vira metro linear pela largura padrão (DNIT/DER: 0,15 m); setas e zebrados não
+  if (s.categoria === "sinalizacao" && u === "m²" && unidade === "m" && ehFaixaPintada(s.descricao)) return { q: q / LARGURA_FAIXA, conv: true };
   return null;
 }
+const LARGURA_FAIXA = 0.15;
+function ehFaixaPintada(desc) { const s = norm(desc); return /faixa|linha/.test(s) && /pintura|tinta|termoplast|resina|acrilic/.test(s) && !/seta|zebrad|simbolo|dizer|placa|fita/.test(s); }
 // documento que só repete outros (ex.: certidão de acervo geral do CREA) fica fora da soma;
 // atestado em nome de outra empresa vale só como acervo do responsável técnico (técnico-profissional)
 const atestadosValidos = (titular = "lm") => atestados.filter(a => a.somar !== false && (a.titular || "lm") === titular);
 // dentro de drenagem, terraplenagem e sinalização só vale serviço da mesma família (sarjeta ≠ tubo)
 const FAMILIAS_SERV = [/sarjeta|valeta/, /\btubo|bueiro|galeria|manilha/, /boca de lobo|poco de visita|caixa coletora|caixa de passagem/,
-  /3.? categoria|rocha/, /empedramento|rachao/, /escavac|\bcorte\b/, /aterro/, /defensa/, /placa|sinalizacao vertical/, /sinalizacao horizontal|pintura de faixa|tinta/];
+  /3.? categoria|rocha/, /empedramento|rachao/, /escavac|\bcorte\b/, /aterro/, /defensa/, /placa|sinalizacao vertical/, /sinalizacao horizontal|pintura|faixa|linha|tinta|termoplast|resina|tacha/];
 function familiaDe(txt) { const s = norm(txt); return FAMILIAS_SERV.find(rx => rx.test(s)) || null; }
 function acervoPara(categoria, unidade, titular = "lm", familia = null) {
   let soma = 0, maior = 0, maiorAt = null, maiorConv = false, conv = false, n = 0;
@@ -2900,7 +2904,9 @@ function compararExigencia(linha) {
   const familia = ["drenagem", "terraplenagem", "sinalizacao"].includes(categoria) ? familiaDe(desc) : null;
   const ac = acervoPara(categoria, unidade, "lm", familia);
   const nome = familia ? desc.replace(/^[^:]*:\s*/, "").split(/ - |,/)[0].trim().slice(0, 40).toLowerCase() : CATEGORIAS_SERV[categoria].split(" (")[0];
-  const txtConv = ` · convertido a ${String(DENSIDADE[categoria]).replace(".", ",")} t/m³`;
+  const txtConv = categoria === "sinalizacao"
+    ? ` · convertido de m² para metro de faixa (largura ${String(LARGURA_FAIXA).replace(".", ",")} m)`
+    : ` · convertido a ${String(DENSIDADE[categoria]).replace(".", ",")} t/m³`;
   // acervo do RT em atestados de outra empresa: só ajuda no técnico-profissional
   const rt = acervoPara(categoria, unidade, "rt", familia);
   const notaRt = rt.maior >= qtd ? ` · O RT tem CAT (em outra empresa) com ${fmtQtd(rt.maior)} ${unidade}: serve só para o técnico-profissional` : "";
