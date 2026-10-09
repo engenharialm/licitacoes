@@ -721,7 +721,8 @@
     </div>
     <div class="modal-foot">
       <button class="btn btn-danger-ghost btn-sm" id="m-excluir" style="visibility:hidden;">Excluir</button>
-      <div style="display:flex;gap:10px;">
+      <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" id="m-card" type="button" title="Ficha de 1 página com os links do edital e da planilha — salve como PDF">Card PDF</button>
         <button class="btn btn-ghost" data-close>Cancelar</button>
         <button class="btn btn-accent" id="m-salvar">Salvar</button>
       </div>
@@ -1625,6 +1626,140 @@ async function arquivosPncp(c) {
   return { arqs, editais, planilhas, resto };
 }
 
+// edital e planilha principais: primeiro os links colocados à mão, depois os arquivos do PNCP
+async function docsPrincipais(l) {
+  const manuais = l.documentos || [];
+  let edital = manuais.find(d => /edital/i.test(norm(d.titulo)));
+  let planilha = manuais.find(d => RX_DOC_PLANILHA.test(norm(d.titulo)));
+  const c = pncpCompra(l);
+  if (c && (!edital || !planilha)) {
+    try {
+      const { editais, planilhas } = await arquivosPncp(c);
+      edital = edital || [...editais].filter(a => !/\.(zip|rar|7z)$/i.test(a.titulo)).sort((a, b) => b.data.localeCompare(a.data))[0] || editais[0];
+      planilha = planilha || planilhas.find(a => /planilha|orcament/.test(norm(a.titulo))) || planilhas[0];
+    } catch { /* PNCP fora do ar: fica só o que foi colocado à mão */ }
+  }
+  return { edital, planilha };
+}
+
+// card de 1 página (A4) para salvar em PDF, com os links clicáveis
+async function gerarCard(id) {
+  const l = licitacoes.find(x => x.id === id);
+  if (!l) return;
+  // a janela precisa abrir já no clique, senão o navegador bloqueia como pop-up
+  const w = window.open("", "_blank");
+  if (!w) { toast("O navegador bloqueou a nova janela. Libere pop-ups para este site.", true); return; }
+  w.document.write(`<p style="font-family:sans-serif;padding:30px;color:#555;">Montando o card…</p>`);
+  const { edital, planilha } = await docsPrincipais(l);
+  const p = l.pncp, a = l.alerta;
+  const reg = regiaoDe(l);
+  const linhas = linhasAtestado(l);
+  const ip = indicePrincipal(linhas);
+  const servicos = (l.servicos || []).filter(s => s.nome).sort((x, y) => (Number(y.pct) || 0) - (Number(x.pct) || 0));
+  const maxPct = Math.max(1, ...servicos.map(s => Number(s.pct) || 0));
+  const cidade = cidadeExibicao(l) || l.cidade || "";
+  const modalidade = p?.modalidade || a?.modalidade || "";
+  const interesse = { SIM: ["VAMOS PARTICIPAR", "#4D7C0F"], NAO: ["NÃO VAMOS PARTICIPAR", "#B91C1C"] }[l.interesse] || ["A DECIDIR", "#B45309"];
+  const e = escapeHtml;
+  const links = [
+    edital && safeUrl(edital.url) ? ["Edital", edital.url, edital.titulo] : null,
+    planilha && safeUrl(planilha.url) ? ["Planilha orçamentária", planilha.url, planilha.titulo] : null,
+    safeUrl(p?.linkPncp) ? ["Página no PNCP (todos os anexos)", p.linkPncp, ""] : null,
+    safeUrl(l.linkPortal) ? ["Portal de origem", l.linkPortal, ""] : null,
+    safeUrl(a?.link) ? ["Alerta Licitação", a.link, ""] : null,
+    ...(l.documentos || []).filter(d => safeUrl(d.url) && d.url !== edital?.url && d.url !== planilha?.url).map(d => [d.titulo || "Link", d.url, ""])
+  ].filter(Boolean);
+  const fato = (rot, val) => `<div class="fato"><span>${rot}</span><b>${val ? e(String(val)) : "—"}</b></div>`;
+  const nomeArq = `Card ${cidade || l.orgao || ""} ${l.numero || ""}`.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 90);
+  const logo = new URL("logo-lm.png", location.href).href;
+
+  w.document.open();
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${e(nomeArq)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  @page{size:A4;margin:10mm;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Space Grotesk',Arial,sans-serif;color:#1F2937;background:#E9EEF2;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .barra{position:sticky;top:0;background:#0F2A3D;color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;font-size:13px;}
+  .barra button{background:#0B83B2;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;}
+  .folha{width:190mm;margin:14px auto;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.12);}
+  .card{padding:9mm 10mm;transform-origin:top left;}
+  .topo{display:flex;align-items:center;gap:12px;border-bottom:3px solid #0B83B2;padding-bottom:10px;}
+  .topo img{height:34px;}
+  .topo .t{font-size:10px;letter-spacing:1.5px;color:#64748B;font-weight:700;}
+  .topo .g{margin-left:auto;font-size:9px;color:#64748B;text-align:right;}
+  .selo{display:inline-block;margin-top:12px;padding:4px 10px;border-radius:20px;color:#fff;font-size:10px;font-weight:700;letter-spacing:.8px;}
+  h1{font-size:19px;margin:6px 0 2px;line-height:1.2;}
+  .org{font-size:11.5px;color:#3F4A59;}
+  .obj{margin-top:10px;font-size:11.5px;line-height:1.45;background:#F4F9FC;border-left:3px solid #0B83B2;padding:8px 10px;border-radius:0 6px 6px 0;}
+  .fatos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px;}
+  .fato{border:1px solid #DCE4EA;border-radius:8px;padding:6px 9px;}
+  .fato span{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.6px;color:#64748B;font-weight:700;}
+  .fato b{font-size:12px;}
+  .fato.largo{margin-top:6px;}
+  .fato.largo b{font-size:10.5px;font-weight:600;line-height:1.4;}
+  .fato.dest{background:#0B83B2;border-color:#0B83B2;color:#fff;}
+  .fato.dest span{color:#D6EEF7;}
+  h2{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#0B83B2;margin:14px 0 6px;}
+  .serv{display:grid;grid-template-columns:52% 1fr 42px;align-items:center;gap:8px;font-size:10px;margin-bottom:3px;}
+  .serv .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .serv .b{height:8px;background:#E8F2F8;border-radius:4px;overflow:hidden;}
+  .serv .b i{display:block;height:100%;background:#0B83B2;border-radius:4px;}
+  .serv .p{text-align:right;font-weight:700;}
+  ul.at{list-style:none;font-size:10px;line-height:1.4;}
+  ul.at li{padding:3px 0 3px 10px;border-left:2px solid #DCE4EA;margin-bottom:2px;}
+  ul.at li.pr{border-left-color:#0B83B2;background:#F4F9FC;font-weight:600;}
+  .obs{font-size:10.5px;line-height:1.45;white-space:pre-wrap;}
+  .links{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
+  .links a{display:block;border:1.5px solid #0B83B2;border-radius:8px;padding:7px 10px;text-decoration:none;color:#0B83B2;font-weight:700;font-size:11.5px;}
+  .links a small{display:block;color:#64748B;font-weight:500;font-size:8.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .links a.pri{background:#0B83B2;color:#fff;}
+  .links a.pri small{color:#D6EEF7;}
+  .sem{font-size:10px;color:#B45309;}
+  .rod{margin-top:14px;padding-top:8px;border-top:1px solid #DCE4EA;font-size:8.5px;color:#94A3B8;display:flex;justify-content:space-between;}
+  @media print{ body{background:#fff;} .barra{display:none;} .folha{margin:0;box-shadow:none;width:auto;} }
+</style></head><body>
+<div class="barra"><button onclick="window.print()">Salvar como PDF / imprimir</button><span>No destino, escolha <b>Salvar como PDF</b>. Os botões de link continuam clicáveis no PDF.</span></div>
+<div class="folha"><div class="card" id="card">
+  <div class="topo"><img src="${e(logo)}" alt="LM"><div class="t">FICHA DA LICITAÇÃO</div>
+    <div class="g">LM Construtora · Controle de licitações<br>gerado em ${new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</div></div>
+  <span class="selo" style="background:${interesse[1]}">${interesse[0]}</span>
+  <h1>${e(cidade || "Local a conferir")}${reg ? ` <span style="font-size:12px;color:#64748B;font-weight:500;">· ${reg.km} km de ${e(reg.base)}</span>` : ""}</h1>
+  <div class="org">${e(l.orgao || "")}${l.numero ? ` · Nº ${e(l.numero)}` : ""}${modalidade ? ` · ${e(modalidade)}` : ""}</div>
+  <div class="obj">${e(l.objeto || "")}</div>
+  <div class="fatos">
+    <div class="fato dest"><span>Sessão</span><b>${e(fmtDateTime(l.dataSessao) || "—")}</b></div>
+    <div class="fato dest"><span>Valor estimado</span><b>${e(fmtMoney(l.valor) || "—")}</b></div>
+    ${p?.dataEncerramento && fmtDateTime(p.dataEncerramento) !== fmtDateTime(l.dataSessao) ? fato("Prazo de propostas", fmtDateTime(p.dataEncerramento)) : fato("Modalidade", modalidade)}
+    ${fato("Garantia de proposta", l.garantiaProposta)}
+    ${fato("Região de interesse", reg ? (reg.dentro ? "Dentro" : "Fora") + ` (${reg.km} km de ${reg.base})` : "")}
+    ${fato("Nº da licitação", l.numero)}
+  </div>
+  ${l.qtdAsfalto ? `<div class="fato largo"><span>Quantidade de asfalto</span><b>${e(l.qtdAsfalto)}</b></div>` : ""}
+  ${servicos.length ? `<h2>Serviços · % do orçamento</h2>${servicos.slice(0, 9).map(s => `
+    <div class="serv"><span class="n">${e(s.nome)}</span><span class="b"><i style="width:${Math.min(100, (Number(s.pct) || 0) / maxPct * 100)}%"></i></span><span class="p">${s.pct !== null && s.pct !== undefined ? e(String(s.pct).replace(".", ",")) + "%" : "—"}</span></div>`).join("")}
+    ${servicos.length > 9 ? `<div class="sem" style="color:#64748B;">+ ${servicos.length - 9} serviços menores</div>` : ""}` : ""}
+  ${linhas.length ? `<h2>Atestados exigidos</h2><ul class="at">${linhas.slice(0, 10).map((s, i) => `<li class="${i === ip ? "pr" : ""}">${i === ip ? "★ " : ""}${e(s)}</li>`).join("")}</ul>
+    ${linhas.length > 10 ? `<div class="sem" style="color:#64748B;">+ ${linhas.length - 10} itens — ver no edital</div>` : ""}` : ""}
+  ${l.observacao ? `<h2>Observações</h2><div class="obs">${e(l.observacao)}</div>` : ""}
+  <h2>Documentos (clique para abrir)</h2>
+  ${links.length ? `<div class="links">${links.map(([t, u, sub], i) => `<a class="${i < 2 && /Edital|Planilha/.test(t) ? "pri" : ""}" href="${e(u)}" target="_blank" rel="noopener">${e(t)}<small>${e(sub && sub !== t.split(" ")[0] ? sub : u)}</small></a>`).join("")}</div>`
+    : `<div class="sem">Nenhum link de documento cadastrado para esta licitação.</div>`}
+  ${!planilha && links.length ? `<div class="sem" style="margin-top:6px;">Planilha não publicada separada — veja nos anexos do edital ou no portal.</div>` : ""}
+  <div class="rod"><span>${e(l.orgao || "")}</span><span>Confira sempre os dados no edital oficial.</span></div>
+</div></div>
+<script>
+  // garante 1 folha: se passar da altura útil do A4, reduz o card proporcionalmente
+  function caber(){ var c=document.getElementById('card'); var util=277*96/25.4 - 4, k=1; c.style.zoom=1;
+    for(var i=0;i<6;i++){ var h=c.getBoundingClientRect().height; if(h<=util) break; k=k*util/h*0.99; c.style.zoom=k; } }
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(function(){ var img=document.querySelector('.topo img');
+    var ok=function(){ caber(); setTimeout(function(){ window.print(); }, 250); };
+    if(img.complete) ok(); else { img.onload=ok; img.onerror=ok; } });
+<\/script>
+</body></html>`);
+  w.document.close();
+}
+
 // botões Edital / Planilha / Portal no formulário de edição
 async function renderAtalhosDocs(l) {
   const box = document.getElementById("m-atalhos");
@@ -1904,6 +2039,7 @@ function abrirModal(id) {
       <br><a href="${escapeHtml(safeUrl(a.link))}" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600;">Abrir no Alerta Licitação →</a>`;
   } else box.style.display = "none";
   document.getElementById("m-excluir").style.visibility = id && !automatica(l) ? "visible" : "hidden";
+  document.getElementById("m-card").style.display = id ? "" : "none";
   renderAtalhosDocs(l);
   modalLic.classList.add("open");
 }
@@ -2904,6 +3040,7 @@ document.getElementById("m-servicos").addEventListener("click", e => {
 });
 document.getElementById("m-servicos").addEventListener("input", atualizarSomaServ);
 document.getElementById("m-salvar").addEventListener("click", salvarModal);
+document.getElementById("m-card").addEventListener("click", () => { if (editingId) gerarCard(editingId); });
 document.getElementById("m-excluir").addEventListener("click", excluirAtual);
 document.getElementById("btn-add").addEventListener("click", () => abrirModal(null));
 document.getElementById("btn-pncp").addEventListener("click", atualizarPncp);
