@@ -303,6 +303,15 @@
   .cal-item .l1 b{color:#0F2A3D;}
   .cal-item .obj{font-size:.7rem;color:var(--text-dim);margin-top:2px;}
   @media (max-width:1250px){ .dash-topo{grid-template-columns:1fr;} .dash-cal{position:static;} }
+  /* certidões */
+  .cert-alerta{display:flex;align-items:center;gap:10px;width:100%;text-align:left;margin-bottom:14px;padding:10px 14px;border-radius:10px;border:1px solid #F59E0B;background:#FFFBEB;color:#92400E;font-family:inherit;font-size:.82rem;cursor:pointer;}
+  .cert-alerta.vencida{border-color:#DC2626;background:#FEF2F2;color:#991B1B;}
+  .cert-alerta[hidden]{display:none;}
+  .cert-alerta b{white-space:nowrap;}
+  .cert-alerta .ir{margin-left:auto;font-weight:700;white-space:nowrap;}
+  .tab .count.alerta{background:#DC2626;color:#fff;}
+  .badge.vencida{background:#FEE2E2;color:#B91C1C;}
+  .cal-item.cert{border-left-color:#DC2626;}
   .decide-item:last-child{border-bottom:none;}
   .decide-item .obj{font-size:.76rem;}
   .decide-item .org{font-size:.7rem;color:var(--text-faint);margin-top:2px;}
@@ -481,9 +490,11 @@
     <button class="tab" data-view="dashboard"><span class="t-longo">Dashboard</span><span class="t-curto">Painel</span></button>
     <button class="tab" data-view="controle"><span class="t-longo">Controle de licitações</span><span class="t-curto">Licitações</span> <span class="count" id="tab-count-controle">0</span></button>
     <button class="tab" data-view="ganhas"><span class="t-longo">Ganhas pela LM</span><span class="t-curto">Ganhas</span> <span class="count" id="tab-count-ganhas">0</span></button>
+    <button class="tab" data-view="certidoes"><span class="t-longo">Certidões</span><span class="t-curto">Certidões</span> <span class="count" id="tab-count-cert">0</span></button>
   </nav>
 
   <main>
+    <button class="cert-alerta no-print" id="cert-alerta" type="button" hidden></button>
     <div class="regiao-bar no-print">
       <button class="btn btn-ghost btn-sm" id="btn-so-regiao" title="Mostra só as licitações a até o raio das cidades-base da LM (as sem município definido continuam aparecendo)">Só regiões de interesse</button>
       <span class="muted small" id="regiao-resumo"></span>
@@ -543,7 +554,7 @@
             <button class="icon-btn" data-cal="0" title="Voltar para hoje" type="button">Hoje</button>
           </div>
           <div class="cal-grade" id="cal-grade"></div>
-          <div class="cal-leg"><span><i style="background:var(--warning)"></i>a decidir</span><span><i style="background:var(--accent)"></i>vamos participar</span></div>
+          <div class="cal-leg"><span><i style="background:var(--warning)"></i>a decidir</span><span><i style="background:var(--accent)"></i>vamos participar</span><span><i style="background:#DC2626"></i>certidão vence</span></div>
           <div class="cal-lista-titulo" id="cal-lista-titulo"></div>
           <div class="cal-lista" id="cal-lista"></div>
         </aside>
@@ -565,6 +576,24 @@
         <div class="panel">
           <div class="panel-head">Cidades com maior valor em aberto</div>
           <div class="panel-body" id="dash-cidades"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- CERTIDÕES -->
+    <section class="view" id="view-certidoes">
+      <div class="cards-row" id="cert-cards"></div>
+      <div class="panel">
+        <div class="panel-head">Certidões de habilitação <small>o portal avisa 15 dias antes do vencimento</small>
+          <button class="btn btn-ghost btn-sm" id="cert-add" type="button">+ Nova certidão</button>
+        </div>
+        <div class="table-wrap" style="max-height:none;">
+          <table class="tabela-cards">
+            <thead><tr>
+              <th>Certidão</th><th>Órgão emissor</th><th>Emissão</th><th>Validade</th><th>Situação</th><th>Arquivo</th><th class="no-print"></th>
+            </tr></thead>
+            <tbody id="cert-lista"></tbody>
+          </table>
         </div>
       </div>
     </section>
@@ -819,6 +848,55 @@
 <datalist id="dl-municipios"></datalist>
 
 <!-- MODAL: item da carteira (ganhas) -->
+<div class="modal-backdrop" id="modal-cert">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-head">
+      <h2 id="cert-m-titulo">Certidão</h2>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field">
+          <label>Tipo</label>
+          <select id="cert-m-tipo"></select>
+        </div>
+        <div class="field">
+          <label>Nome da certidão *</label>
+          <input type="text" id="cert-m-nome" placeholder="Ex: CND Federal (RFB/PGFN)">
+        </div>
+        <div class="field full">
+          <label>Órgão emissor</label>
+          <input type="text" id="cert-m-orgao" placeholder="Ex: Receita Federal / PGFN">
+        </div>
+        <div class="field">
+          <label>Data de emissão</label>
+          <input type="date" id="cert-m-emissao">
+        </div>
+        <div class="field">
+          <label>Válida até *</label>
+          <input type="date" id="cert-m-validade">
+          <div class="muted small" id="cert-m-dica" style="margin-top:4px;"></div>
+        </div>
+        <div class="field full">
+          <label>Link do arquivo (OneDrive, Drive...) ou site para emitir</label>
+          <input type="text" id="cert-m-link" placeholder="https://...">
+        </div>
+        <div class="field full">
+          <label>Observação</label>
+          <textarea id="cert-m-obs" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn btn-danger-ghost btn-sm" id="cert-m-excluir" style="visibility:hidden;">Excluir</button>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" data-close>Cancelar</button>
+        <button class="btn btn-accent" id="cert-m-salvar">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-gan">
   <div class="modal" style="max-width:640px;">
     <div class="modal-head">
@@ -1387,7 +1465,9 @@ async function init() {
   carregarMapaGeo();
   try {
     let metaRegioes;
-    [licitacoes, meta, metaAlerta, metaRegioes, ganhas] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta"), store.getMeta("regioes"), storeGanhas.loadAll(), carregarMunicipios()]);
+    let metaCert;
+    [licitacoes, meta, metaAlerta, metaRegioes, ganhas, metaCert] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta"), store.getMeta("regioes"), storeGanhas.loadAll(), store.getMeta("certidoes"), carregarMunicipios()]);
+    certidoes = Array.isArray(metaCert?.lista) ? metaCert.lista : [];
     if (metaRegioes && Array.isArray(metaRegioes.lista) && metaRegioes.lista.length) regioes = metaRegioes.lista;
     setConnStatus(true);
   } catch (e) {
@@ -1416,6 +1496,7 @@ function renderAll() {
   renderDashboard();
   renderTabela();
   renderGanhas();
+  renderCertidoes();
 }
 
 function renderUpdateLine() {
@@ -1534,8 +1615,13 @@ const chaveDia = d => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDa
 function renderCalendario() {
   const grade = document.getElementById("cal-grade");
   if (!grade) return;
+  // sessões de licitação e vencimentos de certidão no mesmo calendário
+  const eventos = [
+    ...calEventos.map(l => ({ quando: l.dataSessao, l })),
+    ...certidoes.filter(c => c.validade).map(c => ({ quando: c.validade + "T00:00", c }))
+  ];
   const porDia = new Map();
-  for (const l of calEventos) { const k = l.dataSessao.slice(0, 10); if (!porDia.has(k)) porDia.set(k, []); porDia.get(k).push(l); }
+  for (const ev of eventos) { const k = ev.quando.slice(0, 10); if (!porDia.has(k)) porDia.set(k, []); porDia.get(k).push(ev); }
   document.getElementById("cal-titulo").textContent = calMes.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
   const hoje = chaveDia(new Date());
   const inicio = new Date(calMes); inicio.setDate(1 - calMes.getDay());   // começa no domingo
@@ -1544,22 +1630,29 @@ function renderCalendario() {
     const d = new Date(inicio); d.setDate(inicio.getDate() + i);
     if (i === 35 && d.getMonth() !== calMes.getMonth()) break;   // não sobra uma semana vazia
     const k = chaveDia(d), evs = porDia.get(k) || [];
-    const pts = evs.slice(0, 4).map(l => `<i style="background:${isSim(l) ? "var(--accent)" : "var(--warning)"}"></i>`).join("");
+    const pts = evs.slice(0, 4).map(ev => `<i style="background:${ev.c ? "#DC2626" : isSim(ev.l) ? "var(--accent)" : "var(--warning)"}"></i>`).join("");
     const cls = [d.getMonth() !== calMes.getMonth() ? "fora" : "", evs.length ? "tem" : "", k === hoje ? "hoje" : "", k === calDia ? "sel" : ""].join(" ");
-    html += `<button type="button" class="cal-dia ${cls}" ${evs.length ? `data-dia="${k}" title="${evs.length} licitação(ões)"` : "disabled"}>${d.getDate()}<span class="pts">${pts}</span></button>`;
+    const nLic = evs.filter(ev => ev.l).length, nCert = evs.length - nLic;
+    const dica = [nLic ? `${nLic} licitação(ões)` : "", nCert ? `${nCert} certidão(ões) vencendo` : ""].filter(Boolean).join(" · ");
+    html += `<button type="button" class="cal-dia ${cls}" ${evs.length ? `data-dia="${k}" title="${dica}"` : "disabled"}>${d.getDate()}<span class="pts">${pts}</span></button>`;
   }
   grade.innerHTML = html;
 
-  const doMes = calEventos.filter(l => l.dataSessao.slice(0, 7) === chaveDia(calMes).slice(0, 7));
-  const lista = (calDia ? porDia.get(calDia) || [] : doMes).slice().sort((a, b) => a.dataSessao.localeCompare(b.dataSessao));
+  const doMes = eventos.filter(ev => ev.quando.slice(0, 7) === chaveDia(calMes).slice(0, 7));
+  const lista = (calDia ? porDia.get(calDia) || [] : doMes).slice().sort((a, b) => a.quando.localeCompare(b.quando));
+  const sessoesMes = doMes.filter(ev => ev.l).length;
   document.getElementById("cal-lista-titulo").innerHTML = calDia
     ? `<span>${new Date(calDia + "T12:00").toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "2-digit" })}</span><button class="icon-btn" data-cal-mes type="button">mês todo</button>`
-    : `<span>Sessões no mês (${doMes.length})</span>`;
-  document.getElementById("cal-lista").innerHTML = lista.length ? lista.map(l => `
+    : `<span>Sessões no mês (${sessoesMes})</span>`;
+  document.getElementById("cal-lista").innerHTML = lista.length ? lista.map(({ l, c, quando }) => c ? `
+    <div class="cal-item cert" data-cert="${escapeHtml(c.id)}">
+      <div class="l1"><b>Certidão: ${escapeHtml(c.nome)}</b><span class="nowrap">${calDia ? "" : quando.slice(8, 10) + "/" + quando.slice(5, 7)}</span></div>
+      <div class="obj">${escapeHtml(situacaoCert(c).txt)} — renovar antes das próximas sessões</div>
+    </div>` : `
     <div class="cal-item ${isSim(l) ? "sim" : ""}" data-edit="${escapeHtml(l.id)}">
       <div class="l1"><b>${escapeHtml(cidadeExibicao(l) || l.cidade || "Local a conferir")}</b><span class="nowrap">${l.valor > 0 ? fmtMoneyCurto(l.valor) : ""}</span></div>
       <div class="obj clamp" style="-webkit-line-clamp:2;">${calDia ? fmtDateTime(l.dataSessao).slice(11) : fmtDateTime(l.dataSessao).slice(0, 5)} · ${escapeHtml(l.objeto)}</div>
-    </div>`).join("") : `<div class="muted small" style="padding:10px 0;">Nenhuma sessão ${calDia ? "neste dia" : "neste mês"}.</div>`;
+    </div>`).join("") : `<div class="muted small" style="padding:10px 0;">Nada ${calDia ? "neste dia" : "neste mês"}.</div>`;
 }
 document.querySelector(".dash-cal").addEventListener("click", e => {
   const nav = e.target.closest("[data-cal]");
@@ -2554,6 +2647,152 @@ function exportarExcel() {
   XLSX.writeFile(wb, `CONTROLE_LICITACOES_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.xlsx`);
 }
 
+/* ------------------------------ certidões ------------------------------ */
+const CERT_AVISO_DIAS = 15;
+// validade usual de cada certidão, para sugerir a data quando só a emissão é preenchida
+const TIPOS_CERT = {
+  federal:     { nome: "CND Federal (Receita / PGFN)", orgao: "Receita Federal / PGFN", dias: 180 },
+  estadual:    { nome: "CND Estadual (SEF-MG)", orgao: "Secretaria de Estado de Fazenda de MG", dias: 90 },
+  municipal:   { nome: "CND Municipal", orgao: "Prefeitura de Sete Lagoas — Secretaria de Fazenda", dias: null },
+  trabalhista: { nome: "CNDT — Trabalhista", orgao: "Justiça do Trabalho (TST)", dias: 180 },
+  fgts:        { nome: "CRF — FGTS", orgao: "Caixa Econômica Federal", dias: 30 },
+  falencia:    { nome: "Falência e concordata", orgao: "TJMG — Comarca de Sete Lagoas", meses: 3 },
+  outra:       { nome: "", orgao: "", dias: null }
+};
+let certidoes = [];
+let certEditId = null;
+let certValidadeAuto = false;   // a validade foi sugerida pelo tipo (pode recalcular)
+
+function diasValidade(v) {
+  if (!v) return null;
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  return Math.round((new Date(v + "T00:00") - hoje) / 864e5);
+}
+function situacaoCert(c) {
+  const d = diasValidade(c.validade);
+  if (d === null) return { cls: "grey", txt: "Sem validade", alerta: false, d };
+  if (d < 0) return { cls: "vencida", txt: `Vencida há ${-d} dia${d === -1 ? "" : "s"}`, alerta: true, d };
+  if (d <= CERT_AVISO_DIAS) return { cls: "warn", txt: d === 0 ? "Vence hoje" : d === 1 ? "Vence amanhã" : `Vence em ${d} dias`, alerta: true, d };
+  return { cls: "lime", txt: `Válida · ${d} dias`, alerta: false, d };
+}
+const fmtData = v => v ? v.split("-").reverse().join("/") : "—";
+
+function renderCertidoes() {
+  const lista = [...certidoes].sort((a, b) => (a.validade || "9").localeCompare(b.validade || "9"));
+  const sit = new Map(lista.map(c => [c.id, situacaoCert(c)]));
+  const vencidas = lista.filter(c => sit.get(c.id).cls === "vencida");
+  const vencendo = lista.filter(c => sit.get(c.id).cls === "warn");
+  const alertas = [...vencidas, ...vencendo];
+
+  const cont = document.getElementById("tab-count-cert");
+  cont.textContent = alertas.length || lista.length;
+  cont.classList.toggle("alerta", alertas.length > 0);
+  cont.title = alertas.length ? `${alertas.length} certidão(ões) vencida(s) ou vencendo em ${CERT_AVISO_DIAS} dias` : "";
+
+  const banner = document.getElementById("cert-alerta");
+  banner.hidden = !alertas.length;
+  banner.classList.toggle("vencida", vencidas.length > 0);
+  banner.innerHTML = alertas.length ? `<b>⚠ Certidões:</b><span>${alertas.map(c => `${escapeHtml(c.nome)} — ${sit.get(c.id).txt.toLowerCase()}`).join(" · ")}</span><span class="ir">ver certidões →</span>` : "";
+
+  document.getElementById("cert-cards").innerHTML = [
+    { label: "Certidões", value: lista.length, cls: "", sub: "cadastradas" },
+    { label: "Válidas", value: lista.length - alertas.length, cls: "lime", sub: `mais de ${CERT_AVISO_DIAS} dias de validade` },
+    { label: `Vencendo em ${CERT_AVISO_DIAS} dias`, value: vencendo.length, cls: "warn", sub: "renovar já" },
+    { label: "Vencidas", value: vencidas.length, cls: vencidas.length ? "warn" : "", sub: "não servem para habilitação" }
+  ].map(c => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls}">${c.value}</div><div class="sub">${c.sub}</div></div>`).join("");
+
+  const tbody = document.getElementById("cert-lista");
+  tbody.innerHTML = lista.length ? lista.map(c => {
+    const s = sit.get(c.id);
+    return `<tr data-cert="${escapeHtml(c.id)}" title="Clique para editar">
+      <td><b>${escapeHtml(c.nome)}</b>${c.obs ? `<div class="muted small">${escapeHtml(c.obs)}</div>` : ""}</td>
+      <td>${escapeHtml(c.orgao || "")}</td>
+      <td class="nowrap">${fmtData(c.emissao)}</td>
+      <td class="nowrap"><b>${fmtData(c.validade)}</b></td>
+      <td><span class="badge ${s.cls}">${s.txt}</span></td>
+      <td>${safeUrl(c.link) ? `<a class="icon-btn" href="${escapeHtml(c.link)}" target="_blank" rel="noopener">Abrir</a>` : `<span class="muted small">—</span>`}</td>
+      <td class="no-print"><button class="icon-btn" data-cert="${escapeHtml(c.id)}">Editar</button></td>
+    </tr>`;
+  }).join("") : `<tr><td colspan="7"><div class="empty-state">Nenhuma certidão cadastrada. Clique em <b>+ Nova certidão</b>.</div></td></tr>`;
+  rotularTabela(tbody);
+  renderCalendario();
+}
+
+function sugerirValidade() {
+  const t = TIPOS_CERT[document.getElementById("cert-m-tipo").value] || {};
+  const emissao = document.getElementById("cert-m-emissao").value;
+  const campo = document.getElementById("cert-m-validade");
+  document.getElementById("cert-m-dica").textContent = t.dias ? `Validade usual: ${t.dias} dias da emissão` : t.meses ? `Validade usual: ${t.meses} meses da emissão` : "";
+  if (!emissao || (campo.value && !certValidadeAuto) || !(t.dias || t.meses)) return;
+  const d = new Date(emissao + "T12:00");
+  if (t.meses) d.setMonth(d.getMonth() + t.meses); else d.setDate(d.getDate() + t.dias);
+  campo.value = chaveDia(d);
+  certValidadeAuto = true;
+}
+function abrirCertidao(id) {
+  certEditId = id || null;
+  const c = id ? certidoes.find(x => x.id === id) : { tipo: "outra" };
+  if (!c) return;
+  const sel = document.getElementById("cert-m-tipo");
+  sel.innerHTML = Object.entries(TIPOS_CERT).map(([k, t]) => `<option value="${k}">${k === "outra" ? "Outra" : escapeHtml(t.nome)}</option>`).join("");
+  sel.value = c.tipo || "outra";
+  document.getElementById("cert-m-titulo").textContent = id ? "Editar certidão" : "Nova certidão";
+  document.getElementById("cert-m-nome").value = c.nome || "";
+  document.getElementById("cert-m-orgao").value = c.orgao || "";
+  document.getElementById("cert-m-emissao").value = c.emissao || "";
+  document.getElementById("cert-m-validade").value = c.validade || "";
+  document.getElementById("cert-m-link").value = c.link || "";
+  document.getElementById("cert-m-obs").value = c.obs || "";
+  document.getElementById("cert-m-excluir").style.visibility = id ? "visible" : "hidden";
+  certValidadeAuto = false;
+  sugerirValidade();
+  document.getElementById("modal-cert").classList.add("open");
+}
+async function gravarCertidoes(lista) {
+  await store.setMeta({ lista, atualizadoEm: new Date().toISOString() }, "certidoes");
+  certidoes = lista;
+  renderCertidoes();
+}
+async function salvarCertidao() {
+  const nome = document.getElementById("cert-m-nome").value.trim();
+  const validade = document.getElementById("cert-m-validade").value;
+  if (!nome || !validade) { toast("Preencha o nome e a data de validade.", true); return; }
+  if (!requireUnlock()) return;
+  const dados = {
+    id: certEditId || "cert-" + Date.now().toString(36),
+    tipo: document.getElementById("cert-m-tipo").value, nome,
+    orgao: document.getElementById("cert-m-orgao").value.trim(),
+    emissao: document.getElementById("cert-m-emissao").value, validade,
+    link: document.getElementById("cert-m-link").value.trim(),
+    obs: document.getElementById("cert-m-obs").value.trim()
+  };
+  try {
+    await gravarCertidoes(certEditId ? certidoes.map(c => c.id === certEditId ? dados : c) : [...certidoes, dados]);
+    document.getElementById("modal-cert").classList.remove("open");
+    toast("Certidão salva.");
+  } catch (e) { toast(e.message || "Erro ao salvar.", true); }
+}
+async function excluirCertidao() {
+  if (!certEditId || !confirm("Excluir esta certidão da lista?") || !requireUnlock()) return;
+  try {
+    await gravarCertidoes(certidoes.filter(c => c.id !== certEditId));
+    document.getElementById("modal-cert").classList.remove("open");
+  } catch (e) { toast(e.message || "Erro ao excluir.", true); }
+}
+document.getElementById("cert-add").addEventListener("click", () => abrirCertidao(null));
+document.getElementById("cert-m-salvar").addEventListener("click", salvarCertidao);
+document.getElementById("cert-m-excluir").addEventListener("click", excluirCertidao);
+document.getElementById("cert-m-emissao").addEventListener("change", sugerirValidade);
+document.getElementById("cert-m-validade").addEventListener("input", () => { certValidadeAuto = false; });
+document.getElementById("cert-m-tipo").addEventListener("change", () => {
+  const t = TIPOS_CERT[document.getElementById("cert-m-tipo").value];
+  const nome = document.getElementById("cert-m-nome"), orgao = document.getElementById("cert-m-orgao");
+  if (t && !nome.value) nome.value = t.nome;
+  if (t && !orgao.value) orgao.value = t.orgao;
+  sugerirValidade();
+});
+document.getElementById("cert-alerta").addEventListener("click", () => mostrarView("certidoes"));
+
 /* ------------------------------ mapa de Minas ------------------------------ */
 // bases da LM (apresentação "Nossas bases"); a usina de Goianira (GO) fica fora do mapa de Minas
 const BASES_LM = [
@@ -3086,6 +3325,8 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
 document.addEventListener("click", e => {
   const intBtn = e.target.closest(".int-btn[data-int]");
   if (intBtn) { setInteresse(intBtn.dataset.id, intBtn.dataset.int); return; }
+  const cert = e.target.closest("[data-cert]");
+  if (cert && !(cert.tagName === "TR" && e.target.closest("a[href]"))) { abrirCertidao(cert.dataset.cert); return; }
   const ganCard = e.target.closest("[data-gan-card]");
   if (ganCard) { clicarCardGanhas(ganCard.dataset.ganCard); return; }
   const ganEdit = e.target.closest("[data-gan-edit]");
