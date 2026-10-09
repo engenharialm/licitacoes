@@ -1911,9 +1911,11 @@ function atestadoCelula(l) {
   const principal = linhas[indicePrincipal(linhas)];
   // pior resultado entre as exigências com quantidade (uma que não atende já barra)
   const cmps = linhas.map(compararExigencia).filter(c => c && c.curto);
-  const pior = cmps.find(c => c.cls === "nao") || cmps.find(c => c.cls === "soma") || cmps[0];
+  // resumo: tudo atende → Atende; nada atende → Não atende; o resto → Atende parcial
+  const pior = !cmps.length ? null : cmps.every(c => c.cls === "ok") ? cmps[0]
+    : cmps.every(c => c.cls === "nao") ? cmps[0] : { cls: "soma", curto: "Atende parcial" };
   return `<button class="atest-btn" data-atest="${escapeHtml(l.id)}" title="Clique para ver todos os atestados exigidos">
-    <span class="atest-label">Principal${pior ? ` <span class="atest-cmp ${pior.cls}" title="Comparado com o acervo da LM">${pior.curto}</span>` : ""}</span>
+    <span class="atest-label">Principal${pior ? ` <span class="atest-cmp ${pior.cls}" title="Comparado com os atestados da LM">${pior.curto}</span>` : ""}</span>
     <span class="atest-main">${escapeHtml(principal)}</span>
     ${linhas.length > 1 ? `<span class="atest-more">ver todos (${linhas.length}) →</span>` : `<span class="atest-more">detalhes →</span>`}
   </button>`;
@@ -1925,7 +1927,7 @@ function abrirAtestados(id) {
   const ip = indicePrincipal(linhas);
   document.getElementById("atest-sub").textContent = `${cidadeExibicao(l)} · ${l.orgao || ""} · ${l.numero || ""}`;
   document.getElementById("atest-lista").innerHTML = linhas.map((s, i) => `
-    <li class="${i === ip ? "principal" : ""}">${i === ip ? `<span class="badge accent">PRINCIPAL</span> ` : ""}${escapeHtml(s)}${(c => c ? `<span class="cmp ${c.cls}">${escapeHtml(c.txt)}</span>` : "")(compararExigencia(s))}</li>`).join("");
+    <li class="${i === ip ? "principal" : ""}">${i === ip ? `<span class="badge accent">PRINCIPAL</span> ` : ""}${escapeHtml(s)}${(c => c ? ` <span class="atest-cmp ${c.cls}" title="${escapeHtml(c.txt)}">${c.curto}</span>` : "")(compararExigencia(s))}</li>`).join("");
   document.getElementById("atest-nota").textContent = [l.preenchidoAuto ? "Extraído do edital automaticamente — confira no edital antes de decidir." : "",
     atestados.length ? "Comparação automática com a aba Atestados LM (soma por tipo de serviço dentro de cada atestado). Confira as parcelas de maior relevância no edital." : ""].filter(Boolean).join(" ");
   document.getElementById("atest-editar").dataset.edit = l.id;
@@ -2085,7 +2087,7 @@ async function gerarCard(id) {
   ${servicos.length ? `<h2>Serviços · % do orçamento</h2>${servicos.slice(0, 9).map(s => `
     <div class="serv"><span class="n">${e(s.nome)}</span><span class="b"><i style="width:${Math.min(100, (Number(s.pct) || 0) / maxPct * 100)}%"></i></span><span class="p">${s.pct !== null && s.pct !== undefined ? e(String(s.pct).replace(".", ",")) + "%" : "—"}</span></div>`).join("")}
     ${servicos.length > 9 ? `<div class="sem" style="color:#64748B;">+ ${servicos.length - 9} serviços menores</div>` : ""}` : ""}
-  ${linhas.length ? `<h2>Atestados exigidos</h2><ul class="at">${linhas.slice(0, 10).map((s, i) => `<li class="${i === ip ? "pr" : ""}">${i === ip ? "★ " : ""}${e(s)}</li>`).join("")}</ul>
+  ${linhas.length ? `<h2>Atestados exigidos</h2><ul class="at">${linhas.slice(0, 10).map((s, i) => `<li class="${i === ip ? "pr" : ""}">${i === ip ? "★ " : ""}${e(s)}${(c => c ? ` <b style="color:${c.cls === "ok" ? "#4D7C0F" : c.cls === "soma" ? "#0B83B2" : "#B91C1C"}">(${c.curto})</b>` : "")(compararExigencia(s))}</li>`).join("")}</ul>
     ${linhas.length > 10 ? `<div class="sem" style="color:#64748B;">+ ${linhas.length - 10} itens — ver no edital</div>` : ""}` : ""}
   ${l.observacao ? `<h2>Observações</h2><div class="obs">${e(l.observacao)}</div>` : ""}
   <h2>Documentos (clique para abrir)</h2>
@@ -2903,10 +2905,10 @@ function compararExigencia(linha) {
   const rt = acervoPara(categoria, unidade, "rt", familia);
   const notaRt = rt.maior >= qtd ? ` · O RT tem CAT (em outra empresa) com ${fmtQtd(rt.maior)} ${unidade}: serve só para o técnico-profissional` : "";
   const conv = ac.conv ? txtConv : "";
-  if (ac.maior >= qtd) return { cls: "ok", curto: "✓ atende", txt: `✓ Atende com 1 atestado: ${ac.maiorAt.contratante} — ${fmtQtd(ac.maior)} ${unidade} de ${nome}${ac.maiorConv ? txtConv : ""}` };
-  if (ac.soma >= qtd) return { cls: "soma", curto: "Σ somando", txt: `Σ Atende somando ${ac.n} atestados (${fmtQtd(ac.soma)} ${unidade}). Maior sozinho: ${fmtQtd(ac.maior)} ${unidade}. Confira se o edital aceita somatório${conv}${notaRt}` };
-  if (!ac.n) return { cls: "sem", curto: "", txt: `Sem atestado de ${nome} em ${unidade} em nome da LM${notaRt}` };
-  return { cls: "nao", curto: "✗ não atende", txt: `✗ Não atende: maior atestado ${fmtQtd(ac.maior)} ${unidade}, soma ${fmtQtd(ac.soma)} ${unidade} (exigido ${fmtQtd(qtd)} ${unidade})${conv}${notaRt}` };
+  if (ac.maior >= qtd) return { cls: "ok", curto: "Atende", txt: `Atende com 1 atestado: ${ac.maiorAt.contratante} — ${fmtQtd(ac.maior)} ${unidade} de ${nome}${ac.maiorConv ? txtConv : ""}` };
+  if (ac.soma >= qtd) return { cls: "soma", curto: "Atende parcial", txt: `Atende só somando ${ac.n} atestados (${fmtQtd(ac.soma)} ${unidade}). Maior sozinho: ${fmtQtd(ac.maior)} ${unidade}. Confira se o edital aceita somatório${conv}${notaRt}` };
+  if (!ac.n) return { cls: "nao", curto: "Não atende", txt: `Sem atestado de ${nome} em ${unidade} em nome da LM${notaRt}` };
+  return { cls: "nao", curto: "Não atende", txt: `Maior atestado ${fmtQtd(ac.maior)} ${unidade}, soma ${fmtQtd(ac.soma)} ${unidade} (exigido ${fmtQtd(qtd)} ${unidade})${conv}${notaRt}` };
 }
 
 // PDF grande dividido em vários documentos do banco
