@@ -91,6 +91,9 @@
   .card .value.lime{color:var(--lime);}
   .card .sub{font-size:.72rem;color:var(--text-faint);margin-top:4px;}
   .card.clickable{cursor:pointer;}
+  #gan-p-ganhos, #gan-p-acomp, #gan-p-pncp{scroll-margin-top:130px;}
+  .piscar{animation:piscar 1.4s ease;}
+  @keyframes piscar{0%,60%{box-shadow:0 0 0 3px var(--accent);}100%{box-shadow:0 0 0 0 transparent;}}
   .card.clickable:hover{border-color:var(--accent-light);background:var(--card-hover);}
 
   .panel{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;}
@@ -460,7 +463,7 @@
         </div>
       </div>
 
-      <div class="panel" style="margin-bottom:16px;">
+      <div class="panel" id="gan-p-ganhos" style="margin-bottom:16px;">
         <div class="panel-head">Contratos ganhos <small id="gan-total-ganhos"></small>
           <button class="btn btn-ghost btn-sm" id="gan-add" type="button">+ Adicionar à carteira</button>
         </div>
@@ -474,7 +477,7 @@
         </div>
       </div>
 
-      <div class="panel" style="margin-bottom:16px;">
+      <div class="panel" id="gan-p-acomp" style="margin-bottom:16px;">
         <div class="panel-head">Processos em acompanhamento <small id="gan-total-acomp"></small></div>
         <div class="table-wrap" style="max-height:none;">
           <table class="tabela-cards">
@@ -486,7 +489,7 @@
         </div>
       </div>
 
-      <div class="panel">
+      <div class="panel" id="gan-p-pncp">
         <div class="panel-head">Contratos da LM publicados no PNCP <small id="gan-pncp-info">CNPJ 32.109.890/0001-60</small>
           <select id="gan-ano" class="btn-sm" style="border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-family:inherit;"></select>
         </div>
@@ -2273,6 +2276,17 @@ function corrigirAcentos(s) {
   try { return decodeURIComponent(escape(s)); } catch { return s; }
 }
 
+let filtroAcomp = null; // "ANALISE" | "ANDAMENTO" | null (todos), escolhido pelos cards do topo
+function clicarCardGanhas(go) {
+  filtroAcomp = go === "ANALISE" || go === "ANDAMENTO" ? go : null;
+  renderGanhas();
+  if (go === "todos") return;
+  const alvo = { ganhos: "gan-p-ganhos", pncp: "gan-p-pncp" }[go] || "gan-p-acomp";
+  const el = document.getElementById(alvo);
+  el.scrollIntoView({ behavior: "smooth", block: "start" });
+  el.classList.remove("piscar"); void el.offsetWidth; el.classList.add("piscar");
+}
+
 function renderGanhas() {
   const ganhos = ganhas.filter(g => g.situacao === "GANHO").sort((a, b) => (b.valor || 0) - (a.valor || 0));
   const analise = ganhas.filter(g => g.situacao === "ANALISE");
@@ -2286,14 +2300,14 @@ function renderGanhas() {
   document.getElementById("tab-count-ganhas").textContent = ganhos.length;
 
   const cards = [
-    { label: "Valor ganho", value: fmtMoneyCurto(soma(ganhos, g => g.valor)), cls: "lime", sub: `${ganhos.length} contratos` },
-    { label: "Ganho em análise", value: fmtMoneyCurto(soma(analise, g => g.valor || g.referencia)), cls: "accent", sub: `${analise.length} processos` },
-    { label: "Em andamento", value: fmtMoneyCurto(soma(andamento, g => g.referencia || g.valor)), cls: "", sub: `referência de ${andamento.length} processos` },
-    { label: "Desconto dos ganhos", value: descPond === null ? "—" : pct(descPond), cls: "", sub: `ponderado sobre ${comRef.length} contratos` },
-    { label: `PNCP ${anoAtual} fora da carteira`, value: contratosPncp === null ? "…" : foraDaCarteira.length, cls: foraDaCarteira.length ? "warn" : "", sub: "contratos da LM a conferir" }
+    { label: "Valor ganho", value: fmtMoneyCurto(soma(ganhos, g => g.valor)), cls: "lime", sub: `${ganhos.length} contratos`, go: "ganhos" },
+    { label: "Ganho em análise", value: fmtMoneyCurto(soma(analise, g => g.valor || g.referencia)), cls: "accent", sub: `${analise.length} processos · ver quais`, go: "ANALISE" },
+    { label: "Em andamento", value: fmtMoneyCurto(soma(andamento, g => g.referencia || g.valor)), cls: "", sub: `referência de ${andamento.length} processos · ver quais`, go: "ANDAMENTO" },
+    { label: "Desconto dos ganhos", value: descPond === null ? "—" : pct(descPond), cls: "", sub: `ponderado sobre ${comRef.length} contratos`, go: "ganhos" },
+    { label: `PNCP ${anoAtual} fora da carteira`, value: contratosPncp === null ? "…" : foraDaCarteira.length, cls: foraDaCarteira.length ? "warn" : "", sub: "contratos da LM a conferir", go: "pncp" }
   ];
   document.getElementById("gan-cards").innerHTML = cards.map(c => `
-    <div class="card"><div class="label">${c.label}</div><div class="value ${c.cls}">${c.value}</div><div class="sub">${c.sub}</div></div>`).join("");
+    <div class="card clickable" data-gan-card="${c.go}" title="Clique para ver a lista"><div class="label">${c.label}</div><div class="value ${c.cls}">${c.value}</div><div class="sub">${c.sub}</div></div>`).join("");
 
   const prazos = [...analise, ...andamento].filter(g => g.prazo).sort((a, b) => a.prazo.localeCompare(b.prazo));
   document.getElementById("gan-prazos").innerHTML = prazos.length ? `<table><tbody>${prazos.map(g => `
@@ -2321,8 +2335,10 @@ function renderGanhas() {
     </tr>`;
   }).join("") : `<tr><td colspan="7"><div class="empty-state">Nenhum contrato ganho cadastrado.</div></td></tr>`;
 
-  const acomp = [...analise, ...andamento];
-  document.getElementById("gan-total-acomp").textContent = `ganho em análise ${fmtMoney(soma(analise, g => g.valor || g.referencia))} · em andamento ${fmtMoney(soma(andamento, g => g.referencia || g.valor))}`;
+  const acomp = filtroAcomp === "ANALISE" ? analise : filtroAcomp === "ANDAMENTO" ? andamento : [...analise, ...andamento];
+  document.getElementById("gan-total-acomp").innerHTML = (filtroAcomp
+    ? `mostrando só <b>${FASES_GAN[filtroAcomp]}</b> <button class="icon-btn" data-gan-card="todos" type="button">ver todos ✕</button> · `
+    : "") + `ganho em análise ${fmtMoney(soma(analise, g => g.valor || g.referencia))} · em andamento ${fmtMoney(soma(andamento, g => g.referencia || g.valor))}`;
   document.getElementById("gan-acomp").innerHTML = acomp.length ? acomp.map(g => `<tr data-gan-edit="${escapeHtml(g.id)}" title="Clique para ver os detalhes">
       <td><b>${escapeHtml(g.local)}</b>${g.cliente ? `<div class="muted small">${escapeHtml(g.cliente)}</div>` : ""}</td>
       <td><span class="badge ${g.situacao === "ANALISE" ? "lime" : "accent"}">${FASES_GAN[g.situacao]}</span></td>
@@ -2462,6 +2478,8 @@ document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () =>
 document.addEventListener("click", e => {
   const intBtn = e.target.closest(".int-btn[data-int]");
   if (intBtn) { setInteresse(intBtn.dataset.id, intBtn.dataset.int); return; }
+  const ganCard = e.target.closest("[data-gan-card]");
+  if (ganCard) { clicarCardGanhas(ganCard.dataset.ganCard); return; }
   const ganEdit = e.target.closest("[data-gan-edit]");
   if (ganEdit && ganEdit.tagName === "TR" && (e.target.closest("a[href]") || String(window.getSelection()).trim())) return;
   if (ganEdit) { abrirGanho(ganEdit.dataset.ganEdit); return; }
