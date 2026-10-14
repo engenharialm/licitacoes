@@ -332,11 +332,6 @@
   .kb-avanca{border:1px solid var(--border);background:var(--bg);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:.72rem;color:var(--accent);font-weight:700;}
   .kb-avanca:hover{background:var(--accent);color:#fff;}
   .and-rel{white-space:pre-wrap;font-family:inherit;font-size:.8rem;line-height:1.5;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:340px;overflow:auto;margin:0;}
-  .and-feed{max-height:380px;overflow:auto;}
-  .and-feed .it{display:grid;grid-template-columns:86px 1fr;gap:8px;padding:7px 4px;border-bottom:1px solid var(--border);font-size:.78rem;cursor:pointer;border-radius:6px;}
-  .and-feed .it:hover{background:var(--card-hover);}
-  .and-feed .quando{color:var(--text-faint);font-size:.7rem;}
-  .and-feed .dia{font-size:.7rem;font-weight:700;text-transform:uppercase;color:var(--text-dim);margin:8px 0 2px;}
   .and-hist{list-style:none;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;}
   .and-hist li{border-left:3px solid var(--accent);padding:4px 10px;font-size:.78rem;background:var(--bg);border-radius:0 6px 6px 0;}
   .and-hist li small{display:block;color:var(--text-faint);font-size:.68rem;}
@@ -685,21 +680,6 @@
     <!-- EM ANDAMENTO -->
     <section class="view" id="view-andamento">
       <div class="cards-row" id="and-cards"></div>
-      <div class="dash-grid">
-        <div class="panel">
-          <div class="panel-head">Relatório do dia <small>pronto para colar no WhatsApp</small>
-            <span style="display:flex;gap:8px;">
-              <label class="muted small" style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="and-rel-hoje"> só o que mudou hoje</label>
-              <button class="btn btn-accent btn-sm" id="and-copiar" type="button">Copiar</button>
-            </span>
-          </div>
-          <div class="panel-body"><pre class="and-rel" id="and-rel"></pre></div>
-        </div>
-        <div class="panel">
-          <div class="panel-head">Últimas atualizações <small>anotações e mudanças de fase, mais recentes primeiro</small></div>
-          <div class="panel-body and-feed" id="and-feed"></div>
-        </div>
-      </div>
       <div class="panel" style="margin-bottom:16px;">
         <div class="panel-head">Processos em andamento <small>clique no cartão para atualizar a fase e anotar · ▶ avança para a próxima fase</small>
           <button class="btn btn-ghost btn-sm" id="and-nova" type="button">+ Nova proposta (obra particular)</button>
@@ -709,6 +689,15 @@
       <div class="panel">
         <div class="panel-head">Licitações com interesse SIM ainda fora do quadro <small>comece o acompanhamento quando o orçamento começar</small></div>
         <div class="panel-body" id="and-sim"></div>
+      </div>
+      <div class="panel" style="margin-top:16px;">
+        <div class="panel-head">Relatório do dia <small>pronto para colar no WhatsApp</small>
+          <span style="display:flex;gap:8px;">
+            <label class="muted small" style="display:flex;align-items:center;gap:4px;cursor:pointer;"><input type="checkbox" id="and-rel-hoje"> só o que mudou hoje</label>
+            <button class="btn btn-accent btn-sm" id="and-copiar" type="button">Copiar</button>
+          </span>
+        </div>
+        <div class="panel-body"><pre class="and-rel" id="and-rel"></pre></div>
       </div>
     </section>
 
@@ -3064,19 +3053,6 @@ function renderRelatorioAndamento(itens) {
   textoRelatorio = [`*ATUALIZAÇÃO DE PROCESSOS — ${new Date().toLocaleDateString("pt-BR")}*`, ...pub.map(linhaRelatorio),
     ...(priv.length ? ["", "*Processos privados*", ...priv.map(linhaRelatorio)] : [])].join("\n");
   document.getElementById("and-rel").textContent = lista.length ? textoRelatorio : (soHoje ? "Nenhum processo foi atualizado hoje." : "Nenhum processo no quadro.");
-
-  // feed das últimas atualizações (anotações e mudanças de fase de todos os processos)
-  const eventos = itens.flatMap(g => (g.historico || []).map(h => ({ g, h }))).sort((a, b) => b.h.em.localeCompare(a.h.em)).slice(0, 40);
-  let diaAnt = "";
-  document.getElementById("and-feed").innerHTML = eventos.length ? eventos.map(({ g, h }) => {
-    const d = new Date(h.em), k = chaveDia(d);
-    const ontem = chaveDia(new Date(Date.now() - 864e5));
-    const rotulo = k === chaveDia(new Date()) ? "Hoje" : k === ontem ? "Ontem" : d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "2-digit" });
-    const cab = k !== diaAnt ? `<div class="dia">${rotulo}</div>` : "";
-    diaAnt = k;
-    return `${cab}<div class="it" data-and="${escapeHtml(g.id)}"><span class="quando">${d.toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}</span>
-      <span><b>${escapeHtml(nomeRelatorio(g))}</b> — ${escapeHtml(h.texto)}</span></div>`;
-  }).join("") : `<div class="muted small">As anotações e mudanças de fase vão aparecer aqui.</div>`;
 }
 document.getElementById("and-rel-hoje").addEventListener("change", () => renderAndamento());
 document.getElementById("and-copiar").addEventListener("click", async () => {
