@@ -57,6 +57,7 @@
     border:none;border-radius:8px;padding:10px 16px;font-family:inherit;
     font-weight:600;font-size:.82rem;cursor:pointer;display:inline-flex;align-items:center;gap:8px;transition:.15s;
   }
+  .btn[hidden], .icon-btn[hidden]{display:none !important;}
   .btn-accent{background:var(--accent);color:#FFFFFF;}
   .btn-accent:hover{background:#096A92;}
   .btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border);}
@@ -700,7 +701,9 @@
         </div>
       </div>
       <div class="panel" style="margin-bottom:16px;">
-        <div class="panel-head">Processos em andamento <small>clique no cartão para atualizar a fase e anotar · ▶ avança para a próxima fase</small></div>
+        <div class="panel-head">Processos em andamento <small>clique no cartão para atualizar a fase e anotar · ▶ avança para a próxima fase</small>
+          <button class="btn btn-ghost btn-sm" id="and-nova" type="button">+ Nova proposta (obra particular)</button>
+        </div>
         <div class="kanban" id="and-quadro"></div>
       </div>
       <div class="panel">
@@ -1017,6 +1020,10 @@
             <option value="">Processo público</option>
             <option value="1">Processo privado (VINCI, Itinera…)</option>
           </select>
+        </div>
+        <div class="field full">
+          <label>Escopo / descrição da proposta</label>
+          <textarea id="and-m-obs" rows="2" placeholder="Ex: Fornecimento de CBUQ faixa B e emulsão RR-1C, retirada na usina LM"></textarea>
         </div>
         <div class="field full">
           <label>Nova anotação (fica no histórico com a data de hoje)</label>
@@ -3082,11 +3089,13 @@ document.getElementById("and-copiar").addEventListener("click", async () => {
 });
 
 function abrirAndamento(id) {
-  const g = ganhas.find(x => x.id === id);
+  // sem id: nova proposta de obra particular (não passa pelo cadastro de licitações)
+  const g = id ? ganhas.find(x => x.id === id) : { situacao: "ANDAMENTO", fase: "orcamento", privado: true, historico: [] };
   if (!g) return;
-  andEditId = id;
+  andEditId = id || null;
   const fase = faseDe(g);
-  document.getElementById("and-m-titulo").textContent = g.local || "Processo";
+  document.getElementById("and-m-titulo").textContent = id ? g.local || "Processo" : "Nova proposta — obra particular";
+  document.getElementById("and-m-excluir").hidden = !id;
   document.getElementById("and-m-sub").textContent = [g.cliente, nomeFase(fase)].filter(Boolean).join(" · ");
   document.getElementById("and-m-fase").innerHTML = FASES_AND.map(f => `<option value="${f.k}">${f.nome}</option>`).join("")
     + `<optgroup label="Resultado">${Object.entries(FINAIS_AND).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</optgroup>`;
@@ -3095,7 +3104,7 @@ function abrirAndamento(id) {
   v("and-m-prazo", (g.prazo || "").slice(0, 16)); v("and-m-etapa", g.etapa); v("and-m-local", g.local); v("and-m-cliente", g.cliente);
   v("and-m-ref", g.referencia); v("and-m-valor", g.valor); v("and-m-desc", g.desconto); v("and-m-pos", g.posicao); v("and-m-nota", "");
   v("and-m-nome", g.nomeRelatorio || ""); document.getElementById("and-m-nome").placeholder = g.local || "Ex: Nazareno CE 04/2026";
-  v("and-m-privado", ehPrivado(g) ? "1" : "");
+  v("and-m-privado", ehPrivado(g) ? "1" : ""); v("and-m-obs", g.obs);
   const hist = [...(g.historico || [])].reverse();
   document.getElementById("and-m-hist").innerHTML = hist.length ? hist.map(h => `<li><small>${new Date(h.em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}${h.fase ? " · " + escapeHtml(nomeFase(h.fase)) : ""}</small>${escapeHtml(h.texto)}</li>`).join("")
     : `<li><small>sem histórico</small>${escapeHtml(g.obs || "As anotações vão aparecer aqui.")}</li>`;
@@ -3123,17 +3132,33 @@ async function gravarAndamento(id, mudancas, nota) {
   if (fase === "ganho") toast("Foi para Contratos ganhos. Confira o valor do contrato na aba Ganhas.");
 }
 async function salvarAndamento() {
-  if (!andEditId || !requireUnlock()) return;
   const g = id => document.getElementById(id).value;
   const num = id => g(id) === "" ? null : Number(g(id));
   const prazo = g("and-m-prazo");
+  const campos = {
+    fase: g("and-m-fase"), prazo: prazo ? prazo + ":00" : "", etapa: g("and-m-etapa").trim(),
+    local: g("and-m-local").trim(), cliente: g("and-m-cliente").trim(),
+    referencia: num("and-m-ref"), valor: num("and-m-valor"), desconto: num("and-m-desc"), posicao: g("and-m-pos").trim(),
+    nomeRelatorio: g("and-m-nome").trim(), privado: g("and-m-privado") === "1", obs: g("and-m-obs").trim()
+  };
+  if (!andEditId && !campos.local && !campos.cliente) { toast("Preencha o local / obra ou o cliente.", true); return; }
+  if (!requireUnlock()) return;
   try {
-    await gravarAndamento(andEditId, {
-      fase: g("and-m-fase"), prazo: prazo ? prazo + ":00" : "", etapa: g("and-m-etapa").trim(),
-      local: g("and-m-local").trim(), cliente: g("and-m-cliente").trim(),
-      referencia: num("and-m-ref"), valor: num("and-m-valor"), desconto: num("and-m-desc"), posicao: g("and-m-pos").trim(),
-      nomeRelatorio: g("and-m-nome").trim(), privado: g("and-m-privado") === "1"
-    }, g("and-m-nota").trim());
+    if (!andEditId) {
+      const agora = new Date().toISOString();
+      const fase = FINAIS_AND[campos.fase] ? "orcamento" : campos.fase;
+      const nota = g("and-m-nota").trim();
+      const dados = { ...campos, fase, situacao: /^1/.test(campos.posicao) ? "ANALISE" : "ANDAMENTO",
+        etapa: campos.etapa || nomeFase(fase), atualizadoEm: agora,
+        historico: [{ em: agora, fase, texto: "Proposta cadastrada" }, ...(nota ? [{ em: agora, fase, texto: nota }] : [])] };
+      const id = await storeGanhas.save(null, dados);
+      ganhas.push({ id, ...dados });
+      renderGanhas();
+      document.getElementById("modal-and").classList.remove("open");
+      toast("Proposta cadastrada no quadro.");
+      return;
+    }
+    await gravarAndamento(andEditId, campos, g("and-m-nota").trim());
     document.getElementById("modal-and").classList.remove("open");
     toast("Processo atualizado.");
   } catch (e) { toast(e.message || "Erro ao salvar.", true); }
@@ -3171,6 +3196,7 @@ async function tirarDoQuadro() {
   catch (e) { toast(e.message || "Erro.", true); }
 }
 document.getElementById("and-m-salvar").addEventListener("click", salvarAndamento);
+document.getElementById("and-nova").addEventListener("click", () => abrirAndamento(null));
 document.getElementById("and-m-excluir").addEventListener("click", tirarDoQuadro);
 document.getElementById("and-m-lic").addEventListener("click", () => {
   const g = ganhas.find(x => x.id === andEditId);
