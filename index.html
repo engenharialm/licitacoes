@@ -312,6 +312,27 @@
   .tab .count.alerta{background:#DC2626;color:#fff;}
   .badge.vencida{background:#FEE2E2;color:#B91C1C;}
   .cal-item.cert{border-left-color:#DC2626;}
+  /* em andamento (quadro por fase) */
+  .kanban{display:flex;gap:12px;overflow-x:auto;padding:14px;align-items:flex-start;}
+  .kb-col{flex:0 0 250px;background:var(--bg);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;max-height:calc(100vh - 260px);}
+  .kb-col.final{flex-basis:220px;}
+  .kb-head{padding:10px 12px;font-size:.74rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-dim);display:flex;justify-content:space-between;align-items:center;border-bottom:3px solid var(--fase,var(--accent));}
+  .kb-head .n{background:var(--card);border-radius:999px;padding:1px 8px;font-size:.7rem;}
+  .kb-body{padding:8px;display:flex;flex-direction:column;gap:8px;overflow-y:auto;min-height:60px;}
+  .kb-body.alvo{background:var(--accent-dim);}
+  .kb-card{background:var(--card);border:1px solid var(--border);border-left:4px solid var(--fase,var(--accent));border-radius:8px;padding:9px 10px;cursor:pointer;font-size:.76rem;}
+  .kb-card:hover{box-shadow:0 3px 10px rgba(0,0,0,.08);}
+  .kb-card .c1{display:flex;justify-content:space-between;gap:6px;align-items:flex-start;}
+  .kb-card .c1 b{font-size:.84rem;color:#0F2A3D;}
+  .kb-card .cli{color:var(--text-faint);font-size:.7rem;margin-top:1px;}
+  .kb-card .et{margin-top:6px;color:var(--text-dim);}
+  .kb-card .rod{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-top:8px;flex-wrap:wrap;}
+  .kb-card .velho{color:var(--warning);font-weight:600;}
+  .kb-avanca{border:1px solid var(--border);background:var(--bg);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:.72rem;color:var(--accent);font-weight:700;}
+  .kb-avanca:hover{background:var(--accent);color:#fff;}
+  .and-hist{list-style:none;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;}
+  .and-hist li{border-left:3px solid var(--accent);padding:4px 10px;font-size:.78rem;background:var(--bg);border-radius:0 6px 6px 0;}
+  .and-hist li small{display:block;color:var(--text-faint);font-size:.68rem;}
   /* atestados da LM */
   .at-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;padding:12px 6px;border-bottom:1px solid var(--border);border-radius:6px;cursor:pointer;}
   .at-item:hover{background:var(--card-hover);}
@@ -517,6 +538,7 @@
     <button class="tab active" data-view="mapa"><span class="t-longo">Mapa da LM</span><span class="t-curto">Mapa</span></button>
     <button class="tab" data-view="dashboard"><span class="t-longo">Dashboard</span><span class="t-curto">Painel</span></button>
     <button class="tab" data-view="controle"><span class="t-longo">Controle de licitações</span><span class="t-curto">Licitações</span> <span class="count" id="tab-count-controle">0</span></button>
+    <button class="tab" data-view="andamento"><span class="t-longo">Em andamento</span><span class="t-curto">Andamento</span> <span class="count" id="tab-count-and">0</span></button>
     <button class="tab" data-view="ganhas"><span class="t-longo">Ganhas pela LM</span><span class="t-curto">Ganhas</span> <span class="count" id="tab-count-ganhas">0</span></button>
     <button class="tab" data-view="atestados"><span class="t-longo">Atestados LM</span><span class="t-curto">Atestados</span> <span class="count" id="tab-count-atest">0</span></button>
     <button class="tab" data-view="certidoes"><span class="t-longo">Certidões</span><span class="t-curto">Certidões</span> <span class="count" id="tab-count-cert">0</span></button>
@@ -650,6 +672,19 @@
             <tbody id="cert-lista"></tbody>
           </table>
         </div>
+      </div>
+    </section>
+
+    <!-- EM ANDAMENTO -->
+    <section class="view" id="view-andamento">
+      <div class="cards-row" id="and-cards"></div>
+      <div class="panel" style="margin-bottom:16px;">
+        <div class="panel-head">Processos em andamento <small>clique no cartão para atualizar a fase e anotar · ▶ avança para a próxima fase</small></div>
+        <div class="kanban" id="and-quadro"></div>
+      </div>
+      <div class="panel">
+        <div class="panel-head">Licitações com interesse SIM ainda fora do quadro <small>comece o acompanhamento quando o orçamento começar</small></div>
+        <div class="panel-body" id="and-sim"></div>
       </div>
     </section>
 
@@ -903,6 +938,74 @@
 <datalist id="dl-municipios"></datalist>
 
 <!-- MODAL: item da carteira (ganhas) -->
+<div class="modal-backdrop" id="modal-and">
+  <div class="modal" style="max-width:720px;">
+    <div class="modal-head">
+      <div>
+        <h2 id="and-m-titulo">Processo</h2>
+        <div class="muted small" id="and-m-sub" style="margin-top:4px;"></div>
+      </div>
+      <button class="modal-close" data-close>✕</button>
+    </div>
+    <div class="modal-body">
+      <div class="form-grid">
+        <div class="field">
+          <label>Fase</label>
+          <select id="and-m-fase"></select>
+        </div>
+        <div class="field">
+          <label>Próximo prazo</label>
+          <input type="datetime-local" id="and-m-prazo">
+        </div>
+        <div class="field full">
+          <label>O que está acontecendo (aparece no cartão)</label>
+          <input type="text" id="and-m-etapa" placeholder="Ex: Diligência pedindo composição do BDI — responder até 16/10">
+        </div>
+        <div class="field">
+          <label>Local / obra</label>
+          <input type="text" id="and-m-local">
+        </div>
+        <div class="field">
+          <label>Cliente / órgão</label>
+          <input type="text" id="and-m-cliente">
+        </div>
+        <div class="field">
+          <label>Valor de referência (R$)</label>
+          <input type="number" id="and-m-ref" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label>Nosso valor (R$)</label>
+          <input type="number" id="and-m-valor" step="0.01" min="0">
+        </div>
+        <div class="field">
+          <label>Nosso desconto (%)</label>
+          <input type="number" id="and-m-desc" step="0.01">
+        </div>
+        <div class="field">
+          <label>Nossa posição</label>
+          <input type="text" id="and-m-pos" placeholder="Ex: 1º">
+        </div>
+        <div class="field full">
+          <label>Nova anotação (fica no histórico com a data de hoje)</label>
+          <textarea id="and-m-nota" rows="2" placeholder="Ex: Enviamos a resposta da diligência por e-mail"></textarea>
+        </div>
+      </div>
+      <div class="modal-section-title"><span>Histórico</span></div>
+      <ul class="and-hist" id="and-m-hist"></ul>
+    </div>
+    <div class="modal-foot">
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-sm" id="and-m-lic" type="button" hidden>Ver licitação</button>
+        <button class="btn btn-danger-ghost btn-sm" id="and-m-excluir" type="button">Tirar do quadro</button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn btn-ghost" data-close>Cancelar</button>
+        <button class="btn btn-accent" id="and-m-salvar">Salvar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="modal-backdrop" id="modal-at">
   <div class="modal" style="max-width:860px;">
     <div class="modal-head">
@@ -1746,6 +1849,7 @@ function renderDashboard() {
   calEventos = base.filter(l => l.dataSessao && (isPendente(l) || (isSim(l) && !STATUS_FINAIS.includes(l.status))));
   renderCalendario();
   renderMapa();   // licitações SIM aparecem no mapa
+  renderAndamento();
 }
 
 // item das listas do painel: cidade em destaque, objeto embaixo e o valor à direita
@@ -2808,6 +2912,189 @@ function exportarExcel() {
   XLSX.writeFile(wb, `CONTROLE_LICITACOES_${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}.xlsx`);
 }
 
+/* ------------------------------ em andamento (quadro por fase) ------------------------------ */
+// os processos são os itens "em análise / em andamento" da carteira (coleção licitacoes_ganhas)
+const FASES_AND = [
+  { k: "orcamento", nome: "Orçamento em andamento", cor: "#94A3B8" },
+  { k: "proposta", nome: "Proposta enviada", cor: "#0EA5E9" },
+  { k: "analise_proposta", nome: "Análise de proposta", cor: "#0B83B2" },
+  { k: "diligencia", nome: "Diligência", cor: "#D97706" },
+  { k: "habilitacao", nome: "Análise de documentos", cor: "#7C3AED" },
+  { k: "recurso", nome: "Recurso / contrarrecurso", cor: "#DC2626" },
+  { k: "homologacao", nome: "Homologação / contrato", cor: "#4D7C0F" }
+];
+const FINAIS_AND = { ganho: "Ganhamos (vai para contratos ganhos)", perdido: "Perdemos / encerrado" };
+const nomeFase = k => FASES_AND.find(f => f.k === k)?.nome || FINAIS_AND[k] || k;
+const emAndamento = () => ganhas.filter(g => g.situacao === "ANALISE" || g.situacao === "ANDAMENTO");
+// itens antigos não têm fase: deduz pelo texto da etapa / observação
+function faseDe(g) {
+  if (g.fase && FASES_AND.some(f => f.k === g.fase)) return g.fase;
+  const t = norm((g.etapa || "") + " " + (g.obs || ""));
+  if (/recurso/.test(t)) return "recurso";
+  if (/diligenc/.test(t)) return "diligencia";
+  if (/habilita|documen/.test(t)) return "habilitacao";
+  if (/homolog|contrato|assinatura/.test(t)) return "homologacao";
+  if (/analise/.test(t)) return "analise_proposta";
+  if (/proposta|sessao|disputa/.test(t)) return "proposta";
+  return g.situacao === "ANALISE" ? "analise_proposta" : "orcamento";
+}
+function diasDesde(iso) { if (!iso) return null; return Math.floor((Date.now() - new Date(iso)) / 864e5); }
+let andEditId = null;
+
+function renderAndamento() {
+  const quadro = document.getElementById("and-quadro");
+  if (!quadro) return;
+  const itens = emAndamento();
+  document.getElementById("tab-count-and").textContent = itens.length;
+  const em7 = itens.filter(g => { const d = diasAte(g.prazo); return d !== null && d >= 0 && d <= 7; });
+  const parados = itens.filter(g => (diasDesde(g.atualizadoEm) ?? 99) > 7);
+  document.getElementById("and-cards").innerHTML = [
+    { label: "No quadro", value: itens.length, cls: "accent", sub: "processos acompanhados" },
+    { label: "Prazos em 7 dias", value: em7.length, cls: em7.length ? "warn" : "", sub: "diligência, recurso, sessão…" },
+    { label: "Sem atualização", value: parados.length, cls: parados.length ? "warn" : "", sub: "há mais de 7 dias" },
+    { label: "Valor em disputa", value: fmtMoneyCurto(itens.reduce((s, g) => s + (Number(g.referencia || g.valor) || 0), 0)), cls: "", sub: "referência dos processos" }
+  ].map(c => `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls}">${c.value}</div><div class="sub">${c.sub}</div></div>`).join("");
+
+  quadro.innerHTML = FASES_AND.map((f, i) => {
+    const daFase = itens.filter(g => faseDe(g) === f.k).sort((a, b) => (a.prazo || "9").localeCompare(b.prazo || "9"));
+    return `<div class="kb-col" style="--fase:${f.cor}">
+      <div class="kb-head"><span>${f.nome}</span><span class="n">${daFase.length}</span></div>
+      <div class="kb-body" data-fase="${f.k}">${daFase.map(g => {
+        const dias = diasDesde(g.atualizadoEm);
+        const desc = g.desconto !== null && g.desconto !== undefined && g.desconto !== "" ? `desc. ${pct(g.desconto)}` : "";
+        return `<div class="kb-card" draggable="true" data-and="${escapeHtml(g.id)}" style="--fase:${f.cor}" title="Clique para atualizar">
+          <div class="c1"><b>${escapeHtml(g.local || "—")}</b><span class="nowrap">${(g.referencia || g.valor) > 0 ? fmtMoneyCurto(g.referencia || g.valor) : ""}</span></div>
+          <div class="cli">${escapeHtml([g.cliente, g.posicao ? g.posicao + " lugar" : "", desc].filter(Boolean).join(" · "))}</div>
+          ${g.etapa ? `<div class="et">${escapeHtml(g.etapa)}</div>` : ""}
+          <div class="rod">
+            <span>${g.prazo ? `${fmtDateTime(g.prazo).slice(0, 10)} ${prazoBadge({ dataSessao: g.prazo })}` : `<span class="muted">sem prazo</span>`}</span>
+            ${i < FASES_AND.length - 1 ? `<button class="kb-avanca" type="button" data-and-av="${escapeHtml(g.id)}" title="Avançar para: ${escapeHtml(FASES_AND[i + 1].nome)}">▶</button>` : ""}
+          </div>
+          <div class="muted small ${dias > 7 ? "velho" : ""}" style="margin-top:4px;">${dias === null ? "" : dias === 0 ? "atualizado hoje" : `atualizado há ${dias} dia${dias > 1 ? "s" : ""}`}</div>
+        </div>`;
+      }).join("") || `<div class="muted small" style="text-align:center;padding:10px 0;">—</div>`}</div>
+    </div>`;
+  }).join("");
+
+  // licitações SIM que ainda não estão no quadro
+  const acompanhadas = new Set(ganhas.map(g => g.licitacaoId).filter(Boolean));
+  const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+  const sim = licitacoes.filter(l => l.interesse === "SIM" && visivel(l) && !acompanhadas.has(l.id) && (!l.dataSessao || new Date(l.dataSessao) >= hoje))
+    .sort((a, b) => (a.dataSessao || "9").localeCompare(b.dataSessao || "9"));
+  document.getElementById("and-sim").innerHTML = sim.length ? sim.map(l => `
+    <div class="decide-item" data-edit="${escapeHtml(l.id)}" title="Clique para ver a licitação">
+      <div><div style="font-weight:600;font-size:.76rem;">${fmtDateTime(l.dataSessao).slice(0, 10) || "sem data"}</div>${prazoBadge(l)}</div>
+      <div style="min-width:0;"><div class="cid">${escapeHtml(cidadeExibicao(l) || l.cidade || "Local a conferir")}</div>
+        <div class="obj clamp" style="-webkit-line-clamp:1;">${escapeHtml(l.objeto)}</div></div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <span class="val">${fmtMoney(l.valor) || ""}</span>
+        <button class="btn btn-ghost btn-sm" type="button" data-and-iniciar="${escapeHtml(l.id)}">Iniciar acompanhamento</button>
+      </div>
+    </div>`).join("") : `<div class="muted small">Todas as licitações SIM já estão no quadro.</div>`;
+}
+
+function abrirAndamento(id) {
+  const g = ganhas.find(x => x.id === id);
+  if (!g) return;
+  andEditId = id;
+  const fase = faseDe(g);
+  document.getElementById("and-m-titulo").textContent = g.local || "Processo";
+  document.getElementById("and-m-sub").textContent = [g.cliente, nomeFase(fase)].filter(Boolean).join(" · ");
+  document.getElementById("and-m-fase").innerHTML = FASES_AND.map(f => `<option value="${f.k}">${f.nome}</option>`).join("")
+    + `<optgroup label="Resultado">${Object.entries(FINAIS_AND).map(([k, n]) => `<option value="${k}">${n}</option>`).join("")}</optgroup>`;
+  document.getElementById("and-m-fase").value = fase;
+  const v = (campo, val) => { document.getElementById(campo).value = val ?? ""; };
+  v("and-m-prazo", (g.prazo || "").slice(0, 16)); v("and-m-etapa", g.etapa); v("and-m-local", g.local); v("and-m-cliente", g.cliente);
+  v("and-m-ref", g.referencia); v("and-m-valor", g.valor); v("and-m-desc", g.desconto); v("and-m-pos", g.posicao); v("and-m-nota", "");
+  const hist = [...(g.historico || [])].reverse();
+  document.getElementById("and-m-hist").innerHTML = hist.length ? hist.map(h => `<li><small>${new Date(h.em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}${h.fase ? " · " + escapeHtml(nomeFase(h.fase)) : ""}</small>${escapeHtml(h.texto)}</li>`).join("")
+    : `<li><small>sem histórico</small>${escapeHtml(g.obs || "As anotações vão aparecer aqui.")}</li>`;
+  document.getElementById("and-m-lic").hidden = !g.licitacaoId || !licitacoes.some(l => l.id === g.licitacaoId);
+  document.getElementById("modal-and").classList.add("open");
+}
+// grava a mudança, com uma linha no histórico
+async function gravarAndamento(id, mudancas, nota) {
+  const g = ganhas.find(x => x.id === id);
+  const antes = faseDe(g);
+  const fase = mudancas.fase || antes;
+  const hist = [...(g.historico || [])];
+  if (fase !== antes) hist.push({ em: new Date().toISOString(), fase, texto: `Fase: ${nomeFase(antes)} → ${nomeFase(fase)}` });
+  if (nota) hist.push({ em: new Date().toISOString(), fase, texto: nota });
+  const pos = (mudancas.posicao ?? g.posicao ?? "").trim();
+  const situacao = fase === "ganho" ? "GANHO" : fase === "perdido" ? "PERDIDO" : /^1/.test(pos) ? "ANALISE" : pos ? "ANDAMENTO" : g.situacao;
+  const dados = { ...mudancas, fase: FINAIS_AND[fase] ? antes : fase, situacao, historico: hist, atualizadoEm: new Date().toISOString() };
+  // texto do cartão que era só o nome da fase acompanha a fase nova
+  if (!FINAIS_AND[fase] && fase !== antes && (!mudancas.etapa || FASES_AND.some(f => f.nome === mudancas.etapa))) dados.etapa = nomeFase(fase);
+  await storeGanhas.save(id, dados);
+  Object.assign(g, dados);
+  renderGanhas();
+  if (fase === "ganho") toast("Foi para Contratos ganhos. Confira o valor do contrato na aba Ganhas.");
+}
+async function salvarAndamento() {
+  if (!andEditId || !requireUnlock()) return;
+  const g = id => document.getElementById(id).value;
+  const num = id => g(id) === "" ? null : Number(g(id));
+  const prazo = g("and-m-prazo");
+  try {
+    await gravarAndamento(andEditId, {
+      fase: g("and-m-fase"), prazo: prazo ? prazo + ":00" : "", etapa: g("and-m-etapa").trim(),
+      local: g("and-m-local").trim(), cliente: g("and-m-cliente").trim(),
+      referencia: num("and-m-ref"), valor: num("and-m-valor"), desconto: num("and-m-desc"), posicao: g("and-m-pos").trim()
+    }, g("and-m-nota").trim());
+    document.getElementById("modal-and").classList.remove("open");
+    toast("Processo atualizado.");
+  } catch (e) { toast(e.message || "Erro ao salvar.", true); }
+}
+async function moverFase(id, fase) {
+  const g = ganhas.find(x => x.id === id);
+  if (!g || faseDe(g) === fase || !requireUnlock()) return;
+  try { await gravarAndamento(id, { fase }); toast(`${g.local}: ${nomeFase(fase)}`); }
+  catch (e) { toast(e.message || "Erro ao mover.", true); }
+}
+async function iniciarAndamento(licId) {
+  const l = licitacoes.find(x => x.id === licId);
+  if (!l || !requireUnlock()) return;
+  const agora = new Date().toISOString();
+  const dados = {
+    situacao: "ANDAMENTO", fase: "orcamento", licitacaoId: l.id,
+    local: cidadeExibicao(l) || l.cidade || "", cliente: l.orgao || "", referencia: Number(l.valor) || null,
+    prazo: l.dataSessao || "", etapa: "Orçamento em andamento — sessão " + (fmtDateTime(l.dataSessao) || "a definir"),
+    link: l.pncp?.linkPncp || l.linkPortal || "", obs: l.objeto || "",
+    historico: [{ em: agora, fase: "orcamento", texto: "Acompanhamento iniciado" }], atualizadoEm: agora
+  };
+  try {
+    const id = await storeGanhas.save(null, dados);
+    ganhas.push({ id, ...dados });
+    renderGanhas();
+    toast("Entrou no quadro em Orçamento em andamento.");
+  } catch (e) { toast(e.message || "Erro ao iniciar.", true); }
+}
+async function tirarDoQuadro() {
+  if (!andEditId || !confirm("Tirar este processo do quadro? (ele vai para Perdido / encerrado na carteira)") || !requireUnlock()) return;
+  try { await gravarAndamento(andEditId, { fase: "perdido" }, "Retirado do quadro"); document.getElementById("modal-and").classList.remove("open"); }
+  catch (e) { toast(e.message || "Erro.", true); }
+}
+document.getElementById("and-m-salvar").addEventListener("click", salvarAndamento);
+document.getElementById("and-m-excluir").addEventListener("click", tirarDoQuadro);
+document.getElementById("and-m-lic").addEventListener("click", () => {
+  const g = ganhas.find(x => x.id === andEditId);
+  document.getElementById("modal-and").classList.remove("open");
+  if (g?.licitacaoId) abrirModal(g.licitacaoId);
+});
+// arrastar o cartão para outra coluna muda a fase
+(function arrastarQuadro() {
+  const quadro = document.getElementById("and-quadro");
+  quadro.addEventListener("dragstart", e => { const c = e.target.closest("[data-and]"); if (c) e.dataTransfer.setData("text/plain", c.dataset.and); });
+  quadro.addEventListener("dragover", e => { const b = e.target.closest(".kb-body"); if (b) { e.preventDefault(); b.classList.add("alvo"); } });
+  quadro.addEventListener("dragleave", e => { const b = e.target.closest(".kb-body"); if (b && !b.contains(e.relatedTarget)) b.classList.remove("alvo"); });
+  quadro.addEventListener("drop", e => {
+    const b = e.target.closest(".kb-body"); if (!b) return;
+    e.preventDefault(); b.classList.remove("alvo");
+    const id = e.dataTransfer.getData("text/plain");
+    if (id) moverFase(id, b.dataset.fase);
+  });
+})();
+
 /* ------------------------------ atestados da LM (acervo técnico) ------------------------------ */
 const CATEGORIAS_SERV = {
   cbuq: "CBUQ / concreto asfáltico", pmf: "PMF (pré-misturado a frio)", tsd: "TSD / micro / lama asfáltica",
@@ -3717,6 +4004,7 @@ function renderGanhas() {
 
   renderContratosPncp();
   renderMapa();
+  renderAndamento();
 }
 
 function renderContratosPncp() {
@@ -3851,6 +4139,17 @@ document.addEventListener("click", e => {
   if (certPdf) { baixarPdfCert(certPdf.dataset.certPdf); return; }
   const cert = e.target.closest("[data-cert]");
   if (cert && !(cert.tagName === "TR" && e.target.closest("a[href]"))) { abrirCertidao(cert.dataset.cert); return; }
+  const andIni = e.target.closest("[data-and-iniciar]");
+  if (andIni) { iniciarAndamento(andIni.dataset.andIniciar); return; }
+  const andAv = e.target.closest("[data-and-av]");
+  if (andAv) {
+    const g = ganhas.find(x => x.id === andAv.dataset.andAv);
+    const i = FASES_AND.findIndex(f => f.k === faseDe(g));
+    if (g && i >= 0 && i < FASES_AND.length - 1) moverFase(g.id, FASES_AND[i + 1].k);
+    return;
+  }
+  const andCard = e.target.closest("[data-and]");
+  if (andCard) { abrirAndamento(andCard.dataset.and); return; }
   const ganCard = e.target.closest("[data-gan-card]");
   if (ganCard) { clicarCardGanhas(ganCard.dataset.ganCard); return; }
   const ganEdit = e.target.closest("[data-gan-edit]");
