@@ -407,6 +407,8 @@
   .toast{background:var(--card);border:1px solid var(--border);border-left:3px solid var(--accent);
     padding:12px 16px;border-radius:8px;font-size:.8rem;box-shadow:0 4px 16px rgba(0,0,0,.12);max-width:340px;}
   .toast.error{border-left-color:var(--danger);}
+  .toast-acao{margin-left:10px;border:1px solid var(--accent);background:transparent;color:var(--accent);border-radius:6px;padding:3px 10px;font-weight:700;font-family:inherit;font-size:.75rem;cursor:pointer;}
+  #btn-lixeira.on{background:#475569;color:#fff;border-color:#475569;}
 
   #btn-menu{display:none;}
   .t-curto{display:none;}
@@ -772,8 +774,8 @@
             <option value="ativos">Pendentes + vamos participar</option>
             <option value="pendentes">Só aguardando decisão</option>
             <option value="sim">Só interesse SIM</option>
-            <option value="nao">Só interesse NÃO</option>
-            <option value="todos">Todas</option>
+            <option value="todos">Todas (menos a lixeira)</option>
+            <option value="nao">🗑 Lixeira (interesse NÃO)</option>
           </select>
           <select id="f-servico">
             <option value="">Todos os serviços</option>
@@ -789,6 +791,7 @@
             <option value="30">Sessão em até 30 dias</option>
           </select>
           <div class="spacer"></div>
+          <button class="btn btn-ghost btn-sm" id="btn-lixeira" type="button" title="Licitações marcadas NÃO: ficam guardadas aqui, fora da lista">🗑 Lixeira <span id="lixeira-n"></span></button>
           <span class="toolbar-count" id="lic-count"></span>
           <div class="rolar-lados" title="Dica: Shift + rodinha do mouse também rola para os lados">
             <button class="icon-btn" id="rolar-esq" type="button" aria-label="Rolar a tabela para a esquerda">◀</button>
@@ -1459,13 +1462,19 @@ const storeGanhas = {
 };
 
 /* ------------------------------ utilitários ------------------------------ */
-function toast(msg, isError) {
+function toast(msg, isError, acao) {
   const wrap = document.getElementById("toast-wrap");
   const el = document.createElement("div");
   el.className = "toast" + (isError ? " error" : "");
   el.textContent = msg;
+  if (acao) {
+    const b = document.createElement("button");
+    b.className = "toast-acao"; b.type = "button"; b.textContent = acao.rotulo;
+    b.addEventListener("click", () => { el.remove(); acao.fn(); });
+    el.appendChild(b);
+  }
   wrap.appendChild(el);
-  setTimeout(() => el.remove(), 5000);
+  setTimeout(() => el.remove(), acao ? 8000 : 5000);
 }
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 function pad(n) { return String(n).padStart(2, "0"); }
@@ -1986,6 +1995,7 @@ function getFiltered() {
     if (fInt === "pendentes" && !isPendente(l)) return false;
     if (fInt === "sim" && !isSim(l)) return false;
     if (fInt === "nao" && l.interesse !== "NAO") return false;
+    if (fInt !== "nao" && l.interesse === "NAO") return false;   // marcadas NÃO só aparecem na lixeira
     if (fServ) {
       const p = fonte(l);
       const nomes = norm((l.servicos || []).map(s => s.nome).join(" "));
@@ -2397,7 +2407,12 @@ function objetoBadges(l) {
 
 function renderTabela() {
   const list = getFiltered();
-  document.getElementById("lic-count").textContent = `${list.length} licitaç${list.length === 1 ? "ão" : "ões"}`;
+  document.getElementById("lic-count").textContent = document.getElementById("f-interesse").value === "nao"
+    ? `${list.length} na lixeira · clique em NÃO de novo para restaurar`
+    : `${list.length} licitaç${list.length === 1 ? "ão" : "ões"}`;
+  const naLixeira = licitacoes.filter(l => l.interesse === "NAO" && visivel(l)).length;
+  document.getElementById("lixeira-n").textContent = naLixeira ? `(${naLixeira})` : "";
+  document.getElementById("btn-lixeira").classList.toggle("on", document.getElementById("f-interesse").value === "nao");
   document.getElementById("tab-count-controle").textContent = licitacoes.filter(l => visivel(l) && (isPendente(l) || isSim(l))).length;
   const tbody = document.getElementById("lic-table");
   if (!list.length) {
@@ -2494,7 +2509,8 @@ async function setInteresse(id, valor) {
     await store.update(id, data);
     Object.assign(l, data);
     renderAll();
-    toast(novo === "SIM" ? "Marcada: vamos participar." : novo === "NAO" ? "Marcada: não vamos participar." : "Decisão desfeita.");
+    if (novo === "NAO") toast("Foi para a lixeira (botão 🗑 Lixeira no Controle de licitações).", false, { rotulo: "Desfazer", fn: () => setInteresse(id, "NAO") });
+    else toast(novo === "SIM" ? "Marcada: vamos participar." : l.interesse === null && valor === "NAO" ? "Restaurada da lixeira." : "Decisão desfeita.");
   } catch (e) { toast(e.message || "Erro ao salvar.", true); }
 }
 
@@ -4367,6 +4383,11 @@ document.getElementById("btn-pncp").addEventListener("click", atualizarPncp);
 document.getElementById("btn-alerta").addEventListener("click", atualizarAlerta);
 document.getElementById("pncp-fechar").addEventListener("click", () => document.getElementById("modal-pncp").classList.remove("open"));
 document.getElementById("btn-export").addEventListener("click", exportarExcel);
+document.getElementById("btn-lixeira").addEventListener("click", () => {
+  const f = document.getElementById("f-interesse");
+  f.value = f.value === "nao" ? "ativos" : "nao";
+  renderTabela();
+});
 document.getElementById("btn-so-regiao").addEventListener("click", () => {
   soRegiao = !soRegiao;
   try { localStorage.setItem("licSoRegiao", soRegiao ? "1" : ""); } catch {}
