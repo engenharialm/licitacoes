@@ -2730,7 +2730,8 @@ async function atualizarPncp() {
         entries.push({ id, data: {
           origem: "PNCP", ...camposDoPncp(pncp), pncp, naListaPncp: true, interesse: null, status: "",
           servicos: servicosIniciais(c), atestados: "", observacao: "", garantiaProposta: "", vencedora: "",
-          camposEditados: [], lote, criadoEm: lote, atualizadoEm: lote
+          camposEditados: [], lote, criadoEm: lote, atualizadoEm: lote,
+          analisePedida: lote   // nova: entra na fila do /analisar-editais
         }});
       } else {
         const upd = { pncp, naListaPncp: true, atualizadoEm: lote };
@@ -2889,7 +2890,8 @@ async function atualizarAlerta() {
         entries.push({ id, data: {
           origem: "ALERTA", ...campos, valor: null, alerta, naListaAlerta: true, interesse: null, status: "",
           servicos: servicosIniciais(c), atestados: "", observacao: "", garantiaProposta: "", vencedora: "",
-          camposEditados: [], lote, criadoEm: lote, atualizadoEm: lote
+          camposEditados: [], lote, criadoEm: lote, atualizadoEm: lote,
+          analisePedida: lote   // nova: entra na fila do /analisar-editais
         }});
       } else {
         const upd = { alerta, naListaAlerta: true, atualizadoEm: lote };
