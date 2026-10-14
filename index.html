@@ -887,6 +887,7 @@
     <div class="modal-foot">
       <button class="btn btn-danger-ghost btn-sm" id="m-excluir" style="visibility:hidden;">Excluir</button>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" id="m-andamento" type="button" title="Salva e coloca no quadro Em andamento">→ Em andamento</button>
         <button class="btn btn-ghost" id="m-card" type="button" title="Ficha de 1 página com os links do edital e da planilha — salve como PDF">Card PDF</button>
         <button class="btn btn-ghost" data-close>Cancelar</button>
         <button class="btn btn-accent" id="m-salvar">Salvar</button>
@@ -2492,11 +2493,15 @@ function abrirModal(id) {
   } else box.style.display = "none";
   document.getElementById("m-excluir").style.visibility = id && !automatica(l) ? "visible" : "hidden";
   document.getElementById("m-card").style.display = id ? "" : "none";
+  const noQuadro = id && ganhas.find(g => g.licitacaoId === id && (g.situacao === "ANALISE" || g.situacao === "ANDAMENTO"));
+  const btnAnd = document.getElementById("m-andamento");
+  btnAnd.textContent = noQuadro ? "Ver em andamento" : "→ Em andamento";
+  btnAnd.dataset.and = noQuadro ? noQuadro.id : "";
   renderAtalhosDocs(l);
   modalLic.classList.add("open");
 }
 
-async function salvarModal() {
+async function salvarModal(paraAndamento = false) {
   if (!requireUnlock()) return;
   const orgao = document.getElementById("m-orgao").value.trim();
   if (!orgao) { toast("Preencha o órgão / cliente.", true); return; }
@@ -2538,10 +2543,12 @@ async function salvarModal() {
       const novo = { ...dados, origem: "MANUAL", criadoEm: dados.atualizadoEm };
       const id = await store.add(novo);
       licitacoes.push({ id, ...novo });
+      editingId = id;
     }
     modalLic.classList.remove("open");
     renderAll();
     toast("Licitação salva.");
+    if (paraAndamento) { await iniciarAndamento(editingId); mostrarView("andamento"); }
   } catch (e) { toast(e.message || "Erro ao salvar.", true); }
 }
 
@@ -2979,7 +2986,7 @@ function renderAndamento() {
   // licitações SIM que ainda não estão no quadro
   const acompanhadas = new Set(ganhas.map(g => g.licitacaoId).filter(Boolean));
   const hoje = new Date(); hoje.setHours(0, 0, 0, 0);
-  const sim = licitacoes.filter(l => l.interesse === "SIM" && visivel(l) && !acompanhadas.has(l.id) && (!l.dataSessao || new Date(l.dataSessao) >= hoje))
+  const sim = licitacoes.filter(l => l.interesse === "SIM" && visivel(l) && !acompanhadas.has(l.id) && (!l.dataSessao || new Date(l.dataSessao) >= new Date(hoje - 30 * 864e5)))
     .sort((a, b) => (a.dataSessao || "9").localeCompare(b.dataSessao || "9"));
   document.getElementById("and-sim").innerHTML = sim.length ? sim.map(l => `
     <div class="decide-item" data-edit="${escapeHtml(l.id)}" title="Clique para ver a licitação">
@@ -3054,19 +3061,22 @@ async function moverFase(id, fase) {
 async function iniciarAndamento(licId) {
   const l = licitacoes.find(x => x.id === licId);
   if (!l || !requireUnlock()) return;
+  if (ganhas.some(g => g.licitacaoId === l.id && (g.situacao === "ANALISE" || g.situacao === "ANDAMENTO"))) return;
   const agora = new Date().toISOString();
+  const sessaoPassou = !!l.dataSessao && new Date(l.dataSessao) < new Date();
   const dados = {
-    situacao: "ANDAMENTO", fase: "orcamento", licitacaoId: l.id,
-    local: cidadeExibicao(l) || l.cidade || "", cliente: l.orgao || "", referencia: Number(l.valor) || null,
-    prazo: l.dataSessao || "", etapa: "Orçamento em andamento — sessão " + (fmtDateTime(l.dataSessao) || "a definir"),
+    situacao: "ANDAMENTO", fase: sessaoPassou ? "proposta" : "orcamento", licitacaoId: l.id,
+    local: cidadeExibicao(l) || l.cidade || l.orgao || "", cliente: l.orgao || "", referencia: Number(l.valor) || null,
+    prazo: sessaoPassou ? "" : l.dataSessao || "",
+    etapa: sessaoPassou ? `Proposta enviada — sessão ${fmtDateTime(l.dataSessao)}` : "Orçamento em andamento — sessão " + (fmtDateTime(l.dataSessao) || "a definir"),
     link: l.pncp?.linkPncp || l.linkPortal || "", obs: l.objeto || "",
-    historico: [{ em: agora, fase: "orcamento", texto: "Acompanhamento iniciado" }], atualizadoEm: agora
+    historico: [{ em: agora, fase: sessaoPassou ? "proposta" : "orcamento", texto: "Acompanhamento iniciado" }], atualizadoEm: agora
   };
   try {
     const id = await storeGanhas.save(null, dados);
     ganhas.push({ id, ...dados });
     renderGanhas();
-    toast("Entrou no quadro em Orçamento em andamento.");
+    toast(`Entrou no quadro em ${nomeFase(dados.fase)}.`);
   } catch (e) { toast(e.message || "Erro ao iniciar.", true); }
 }
 async function tirarDoQuadro() {
@@ -4197,7 +4207,12 @@ document.getElementById("m-servicos").addEventListener("click", e => {
   if (e.target.closest(".sv-del")) { e.target.closest(".serv-row").remove(); atualizarSomaServ(); }
 });
 document.getElementById("m-servicos").addEventListener("input", atualizarSomaServ);
-document.getElementById("m-salvar").addEventListener("click", salvarModal);
+document.getElementById("m-salvar").addEventListener("click", () => salvarModal());
+document.getElementById("m-andamento").addEventListener("click", e => {
+  const id = e.currentTarget.dataset.and;
+  if (id) { modalLic.classList.remove("open"); mostrarView("andamento"); abrirAndamento(id); return; }
+  salvarModal(true);
+});
 document.getElementById("m-card").addEventListener("click", () => { if (editingId) gerarCard(editingId); });
 document.getElementById("m-excluir").addEventListener("click", excluirAtual);
 document.getElementById("btn-add").addEventListener("click", () => abrirModal(null));
