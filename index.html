@@ -900,6 +900,7 @@
     <div class="modal-foot">
       <button class="btn btn-danger-ghost btn-sm" id="m-excluir" style="visibility:hidden;">Excluir</button>
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
+        <button class="btn btn-ghost" id="m-analise" type="button" title="Marca para a leitura automática do edital e da planilha (atestados, % dos serviços, asfalto, garantia)">Pedir análise do edital</button>
         <button class="btn btn-ghost" id="m-andamento" type="button" title="Salva e coloca no quadro Em andamento">→ Em andamento</button>
         <button class="btn btn-ghost" id="m-card" type="button" title="Ficha de 1 página com os links do edital e da planilha — salve como PDF">Card PDF</button>
         <button class="btn btn-ghost" data-close>Cancelar</button>
@@ -2009,7 +2010,8 @@ function getFiltered() {
 function servicosHtml(l) {
   const lista = l.servicos || [];
   const extras = (l.qtdAsfalto ? `<div class="small" style="margin-top:4px;"><b>Asfalto:</b> ${escapeHtml(l.qtdAsfalto)}</div>` : "")
-    + (l.preenchidoAuto ? `<div class="badges"><span class="badge nova" title="${escapeHtml(l.preenchidoAuto)}">preenchido do edital — conferir</span></div>` : "");
+    + (l.preenchidoAuto ? `<div class="badges"><span class="badge nova" title="${escapeHtml(l.preenchidoAuto)}">preenchido do edital — conferir</span></div>`
+      : l.analisePedida ? `<div class="badges"><span class="badge accent" title="Pedida em ${escapeHtml(fmtDateTime(l.analisePedida))} — roda no comando /analisar-editais">análise do edital pedida</span></div>` : "");
   if (lista.length) {
     return [...lista].sort((a, b) => (Number(b.pct) || 0) - (Number(a.pct) || 0)).map(s => `
       <div class="serv-item">
@@ -2521,6 +2523,10 @@ function abrirModal(id) {
   } else box.style.display = "none";
   document.getElementById("m-excluir").style.visibility = id && !automatica(l) ? "visible" : "hidden";
   document.getElementById("m-card").style.display = id ? "" : "none";
+  const btnAn = document.getElementById("m-analise");
+  btnAn.style.display = id && !l.preenchidoAuto ? "" : "none";
+  btnAn.textContent = l.analisePedida ? "Análise pedida ✓" : "Pedir análise do edital";
+  btnAn.disabled = !!l.analisePedida;
   const noQuadro = id && ganhas.find(g => g.licitacaoId === id && (g.situacao === "ANALISE" || g.situacao === "ANDAMENTO"));
   const btnAnd = document.getElementById("m-andamento");
   btnAnd.textContent = noQuadro ? "Ver em andamento" : "→ Em andamento";
@@ -4296,6 +4302,18 @@ document.getElementById("m-servicos").addEventListener("click", e => {
 });
 document.getElementById("m-servicos").addEventListener("input", atualizarSomaServ);
 document.getElementById("m-salvar").addEventListener("click", () => salvarModal());
+document.getElementById("m-analise").addEventListener("click", async () => {
+  if (!editingId || !requireUnlock()) return;
+  const l = licitacoes.find(x => x.id === editingId);
+  const analisePedida = new Date().toISOString();
+  try {
+    await store.update(editingId, { analisePedida });
+    l.analisePedida = analisePedida;
+    const b = document.getElementById("m-analise"); b.textContent = "Análise pedida ✓"; b.disabled = true;
+    renderTabela();
+    toast("Análise pedida. Ela roda no comando /analisar-editais.");
+  } catch (e) { toast(e.message || "Erro ao pedir a análise.", true); }
+});
 document.getElementById("m-andamento").addEventListener("click", e => {
   const id = e.currentTarget.dataset.and;
   if (id) { modalLic.classList.remove("open"); mostrarView("andamento"); abrirAndamento(id); return; }
