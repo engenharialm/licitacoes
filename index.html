@@ -1524,7 +1524,14 @@ const RX = {
   // calçamento (bloquete/intertravado) fica de fora, salvo se o edital também tiver asfalto
   calc: /calcamento|bloquete|intertravad|sextavad|paralelep|polied|\bpedra\b|blocos? de concreto/,
   asf: /asfalt|cbuq|betuminoso|recapeamento|micro\s*-?\s*revestimento|microrrevestimento|tratamento superficial|\btsd\b|\btss\b|\bpmf\b|tapa\s*-?\s*buracos?|fresagem/,
-  tec: /\b(consultoria|gerenciamento|supervisao|fiscalizacao)\b|elaboracao de (estudos|projetos?)/
+  tec: /\b(consultoria|gerenciamento|supervisao|fiscalizacao)\b|elaboracao de (estudos|projetos?)/,
+  // objetos que não dizem "pavimentação": "correção de pavimento nas estradas", "infraestrutura viária",
+  // "obras de infraestrutura do loteamento/assentamento" (o edital é que diz se tem asfalto)
+  pavimento: /\bpavimentos?\b/,
+  via: /\b(estradas?|vias?|ruas?|rodovias?|avenidas?|vicinais?|logradouros?|trechos?)\b/,
+  viario: /infraestrutura viaria|infraestrutura urbana|obras? viarias?|sistema viario|alargamento d[aeo]s? (rua|avenida|via)|infraestrutura.{0,80}(assentamento|loteamento|regularizacao fundiaria|conjunto habitacional)/,
+  // "pavimento" também é andar de prédio
+  predio: /escola|creche|predios?\b|edificac|edificio|\bubs\b|unidade basica|hospital|ginasio|credenciamento|madeira/
 };
 // compra de material sem execução pela contratada (CBUQ, emulsão, agregados...). Olha só o começo do
 // objeto, que diz o que está sendo contratado; "destinada à execução"/"para aplicação" descrevem o uso do material.
@@ -1536,7 +1543,8 @@ function ehAquisicaoMaterial(objeto) {
 function norm(s) { return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
 function classificar(objeto) {
   const n = norm(objeto).replace(RX.neutro, " ");
-  const pav = RX.pav.test(n), ter = RX.ter.test(n), dre = RX.dre.test(n) && RX.dreCtx.test(n);
+  const pavExtra = ((RX.pavimento.test(n) && RX.via.test(n)) || RX.viario.test(n)) && !RX.predio.test(n);
+  const pav = RX.pav.test(n) || pavExtra, ter = RX.ter.test(n), dre = RX.dre.test(n) && RX.dreCtx.test(n);
   const asfalto = RX.asf.test(n);
   // só pavimentação asfáltica; drenagem e terraplenagem entram apenas junto com pavimentação
   if (!pav) return null;
