@@ -1744,6 +1744,8 @@ async function salvarRegioes() {
 
 // a LM não faz calçamento nem vende material: o que cair nisso fica guardado no banco, mas não aparece
 function visivel(l) {
+  // cópia do Alerta de uma licitação que já está no portal pelo PNCP
+  if (l.duplicadaDe) return false;
   if (l.tipoPavimentoEdital === "calcamento") return false;
   // compras de material também não interessam (as cadastradas à mão continuam, ex.: clientes privados)
   if (automatica(l) && ehAquisicaoMaterial(l.objeto)) return false;
@@ -2906,6 +2908,7 @@ async function atualizarAlerta() {
     const existentes = new Map(licitacoes.map(l => [l.id, l]));
     // licitações do PNCP e manuais, para não trazer a mesma de novo
     const outras = licitacoes.filter(l => l.origem !== "ALERTA").map(l => ({ mun: municipioChave(l.cidade), dia: (l.dataSessao || "").slice(0, 10), pal: palavras(l.objeto) }));
+    const idsPortal = new Set(licitacoes.map(l => l.id));
     const lote = new Date().toISOString();
     const entries = [];
     const vistos = new Set();
@@ -2919,7 +2922,13 @@ async function atualizarAlerta() {
       if (abertura && abertura.slice(0, 10) < hoje) continue;
       const mun = municipioChave(it.municipio), pal = palavras(it.objeto), dia = abertura.slice(0, 10);
       const igual = o => o.mun === mun && (similaridade(o.pal, pal) >= 0.8 || (o.dia === dia && similaridade(o.pal, pal) >= 0.5));
-      if (outras.some(igual)) { duplicadas++; continue; }
+      // o Alerta traz o texto do Diário Oficial, que quase nunca se parece com o do PNCP:
+      // mesma cidade com sessão no mesmo dia já é a mesma licitação
+      const mesmoDia = o => o.mun === mun && !!dia && o.dia === dia;
+      // item do Alerta que veio do PNCP traz o número no id (PNCP-<cnpj>-1-<seq>-<ano>)
+      const nPncp = String(it.id_licitacao).match(/PNCP-(\d{14})-\d-0*(\d+)-(\d{4})/);
+      const jaPeloPncp = nPncp && idsPortal.has(`pncp_${nPncp[1]}-1-${nPncp[2].padStart(6, "0")}_${nPncp[3]}`);
+      if (jaPeloPncp || outras.some(o => igual(o) || mesmoDia(o))) { duplicadas++; continue; }
       if (vistasNoAlerta.some(igual)) continue;
       vistasNoAlerta.push({ mun, dia, pal });
       relevantes++;
