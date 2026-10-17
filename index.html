@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Controle de Licitações — LM</title>
+<!-- app instalável (PWA) -->
+<link rel="manifest" href="manifest.webmanifest">
+<meta name="theme-color" content="#0B83B2">
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Licitações LM">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -531,6 +540,7 @@
     </div>
     <button class="btn btn-ghost btn-sm" id="btn-menu" type="button" aria-expanded="false" aria-controls="header-actions">Menu</button>
     <div class="header-actions" id="header-actions">
+      <button class="btn btn-accent btn-sm" id="btn-instalar" type="button" hidden title="Instala o portal como aplicativo, com ícone na tela inicial">📲 Instalar app</button>
       <div class="status-pill" id="conn-status">
         <span class="status-dot"></span>
         <span id="conn-text">Modo local (este navegador)</span>
@@ -4430,6 +4440,35 @@ document.getElementById("reg-add").addEventListener("click", () => document.getE
 document.getElementById("reg-linhas").addEventListener("click", e => { if (e.target.closest(".rg-del")) e.target.closest(".reg-row").remove(); });
 document.getElementById("reg-salvar").addEventListener("click", salvarRegioes);
 document.getElementById("btn-print").addEventListener("click", () => { mostrarView("controle"); setTimeout(() => window.print(), 100); });
+
+/* ------------------------------ aplicativo (PWA) ------------------------------ */
+// o service worker guarda a casca do site; os dados continuam vindo da nuvem
+if ("serviceWorker" in navigator && location.protocol === "https:") {
+  navigator.serviceWorker.register("sw.js").catch(e => console.warn("service worker:", e));
+}
+(function botaoInstalar() {
+  const btn = document.getElementById("btn-instalar");
+  const instalado = matchMedia("(display-mode: standalone)").matches || navigator.standalone === true;
+  if (instalado) return;
+  let pedido = null;
+  // Chrome / Edge / Android: o navegador avisa que dá para instalar
+  addEventListener("beforeinstallprompt", e => { e.preventDefault(); pedido = e; btn.hidden = false; });
+  addEventListener("appinstalled", () => { btn.hidden = true; toast("Aplicativo instalado. Procure o ícone Licitações LM."); });
+  // iPhone / iPad (Safari): não há aviso; mostra como fazer pelo Compartilhar
+  const ios = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1);
+  if (ios) btn.hidden = false;
+  btn.addEventListener("click", async () => {
+    if (pedido) {
+      pedido.prompt();
+      const r = await pedido.userChoice;
+      if (r.outcome === "accepted") btn.hidden = true;
+      pedido = null;
+      return;
+    }
+    if (ios) toast("No iPhone: toque em Compartilhar (quadrado com a seta ↑) e depois em “Adicionar à Tela de Início”.");
+    else toast("No menu do navegador (⋮), escolha “Instalar app” ou “Adicionar à tela inicial”.");
+  });
+})();
 
 init();
 </script>
