@@ -52,6 +52,7 @@
   .brand{display:flex;align-items:center;gap:12px;}
   .brand .logo{width:40px;height:40px;object-fit:contain;flex-shrink:0;}
   .brand .logo-setor{height:46px;width:auto;flex-shrink:0;margin-left:6px;padding-left:12px;border-left:1px solid var(--border);}
+  .brand .logo-pdca-mini{display:none;}
   .brand h1{font-size:1.05rem;font-weight:600;letter-spacing:.2px;color:var(--accent);}
   .brand span{display:block;font-size:.72rem;color:var(--text-dim);font-weight:500;letter-spacing:.5px;}
   .header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -429,6 +430,8 @@
     .brand{gap:10px;min-width:0;}
     .brand .logo{width:32px;height:32px;}
     .brand .logo-setor{height:34px;padding-left:8px;margin-left:2px;}
+    .brand .logo-dpo{display:none;}
+    .brand .logo-pdca-mini{display:block;}
     .brand h1{font-size:.95rem;}
     .brand span{display:none;}
     #btn-menu{display:inline-flex;margin-left:auto;}
@@ -539,7 +542,8 @@
         <h1>Controle de Licitações</h1>
         <span>LM CONSTRUTORA — PAVIMENTAÇÃO · TERRAPLENAGEM · DRENAGEM</span>
       </div>
-      <img class="logo-setor" src="logo-pdca.png" alt="PDCA — setor de licitações LM" title="Setor de licitações — ciclo PDCA">
+      <img class="logo-setor logo-dpo" src="logo-dpo.png" alt="Diretoria de Planejamento e Orçamento" title="Diretoria de Planejamento e Orçamento — ciclo PDCA">
+      <img class="logo-setor logo-pdca-mini" src="logo-pdca.png" alt="Diretoria de Planejamento e Orçamento" title="Diretoria de Planejamento e Orçamento — ciclo PDCA">
     </div>
     <button class="btn btn-ghost btn-sm" id="btn-menu" type="button" aria-expanded="false" aria-controls="header-actions">Menu</button>
     <div class="header-actions" id="header-actions">
@@ -2225,7 +2229,7 @@ async function gerarCard(id) {
   const fato = (rot, val) => `<div class="fato"><span>${rot}</span><b>${val ? e(String(val)) : "—"}</b></div>`;
   const nomeArq = `Card ${cidade || l.orgao || ""} ${l.numero || ""}`.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 90);
   const logo = new URL("logo-lm.png", location.href).href;
-  const logoSetor = new URL("logo-pdca.png", location.href).href;
+  const logoSetor = new URL("logo-dpo.png", location.href).href;
 
   w.document.open();
   w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${e(nomeArq)}</title>
@@ -2239,19 +2243,20 @@ async function gerarCard(id) {
   .folha{width:190mm;margin:14px auto;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.12);}
   html{font-size:10px;}
   .card{padding:9mm 10mm;font-size:1rem;}
-  .topo{display:flex;align-items:center;gap:1.2rem;border-bottom:3px solid #0B83B2;padding-bottom:1rem;}
-  .topo img{height:3.4rem;}
-  .topo img.setor{height:4.8rem;margin-left:0.4rem;}
+  /* cabeçalho em px: fica igual em todo card, só o conteúdo abaixo acompanha a escala */
+  .topo{display:flex;align-items:center;gap:12px;border-bottom:3px solid #0B83B2;padding-bottom:10px;}
+  .topo img{height:40px;}
+  .topo img.setor{height:72px;margin-left:4px;}
   .topo img{flex-shrink:0;}
   .topo .t{min-width:0;}
-  .topo .t{font-size:1rem;letter-spacing:0.15rem;color:#64748B;font-weight:700;}
-  .topo .g{margin-left:auto;font-size:0.9rem;color:#64748B;text-align:right;white-space:nowrap;}
+  .topo .t{font-size:10px;letter-spacing:1.5px;color:#64748B;font-weight:700;}
+  .topo .g{margin-left:auto;font-size:8.5px;color:#94A3B8;text-align:right;white-space:nowrap;}
   .selo{display:inline-block;margin-top:1.2rem;padding:0.4rem 1rem;border-radius:2rem;color:#fff;font-size:1rem;font-weight:700;letter-spacing:0.08rem;}
   h1{font-size:1.9rem;margin:0.6rem 0 0.2rem;line-height:1.2;}
   .org{font-size:1.15rem;color:#3F4A59;}
   .obj{margin-top:1rem;font-size:1.15rem;line-height:1.45;background:#F4F9FC;border-left:3px solid #0B83B2;padding:0.8rem 1rem;border-radius:0 0.6rem 0.6rem 0;}
-  .fatos{display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin-top:1.2rem;}
-  .fato{border:1px solid #DCE4EA;border-radius:0.8rem;padding:0.6rem 0.9rem;}
+  .fatos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0.6rem;margin-top:1.2rem;}
+  .fato{min-width:0;overflow-wrap:break-word;border:1px solid #DCE4EA;border-radius:0.8rem;padding:0.6rem 0.9rem;}
   .fato span{display:block;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.06rem;color:#64748B;font-weight:700;}
   .fato b{font-size:1.2rem;}
   .fato.largo{margin-top:0.6rem;}
@@ -2280,15 +2285,15 @@ async function gerarCard(id) {
 <div class="barra"><button onclick="window.print()">Salvar como PDF / imprimir</button><span>No destino, escolha <b>Salvar como PDF</b>. Os botões de link continuam clicáveis no PDF.</span></div>
 <div class="folha"><div class="card" id="card">
   <div class="topo"><img src="${e(logo)}" alt="LM"><div class="t">FICHA DA LICITAÇÃO</div>
-    <div class="g">Setor de licitações<br>${new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</div>
-    <img class="setor" src="${e(logoSetor)}" alt="PDCA"></div>
+    <div class="g">gerado em<br>${new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</div>
+    <img class="setor" src="${e(logoSetor)}" alt="Diretoria de Planejamento e Orçamento"></div>
   <span class="selo" style="background:${interesse[1]}">${interesse[0]}</span>
   <h1>${e(cidade || "Local a conferir")}${reg ? ` <span style="font-size:0.6em;color:#64748B;font-weight:500;">· ${reg.km} km de ${e(reg.base)}</span>` : ""}</h1>
   <div class="org">${e(l.orgao || "")}${l.numero ? ` · Nº ${e(l.numero)}` : ""}${modalidade ? ` · ${e(modalidade)}` : ""}</div>
   <div class="obj">${e(l.objeto || "")}</div>
   <div class="fatos">
     <div class="fato dest"><span>Sessão</span><b>${e(fmtDateTime(l.dataSessao) || "—")}</b></div>
-    <div class="fato dest"><span>Valor estimado</span><b>${e(fmtMoney(l.valor) || "—")}</b></div>
+    <div class="fato dest"><span>Valor estimado</span><b>${e((fmtMoney(l.valor) || "—").replace(/ /g, " "))}</b></div>
     ${p?.dataEncerramento && fmtDateTime(p.dataEncerramento) !== fmtDateTime(l.dataSessao) ? fato("Prazo de propostas", fmtDateTime(p.dataEncerramento)) : fato("Modalidade", modalidade)}
     ${fato("Garantia de proposta", l.garantiaProposta)}
     ${fato("Região de interesse", reg ? (reg.dentro ? "Dentro" : "Fora") + ` (${reg.km} km de ${reg.base})` : "")}
@@ -2311,11 +2316,11 @@ async function gerarCard(id) {
   // sempre 1 folha A4: acha a maior escala em que o card ainda cabe na altura útil.
   // Pouca informação -> letra maior para ocupar a folha; muita -> letra menor para não passar de 1 página.
   // A largura é compensada (largura / escala) para o card continuar com a largura da folha.
-  function caber(){ var c=document.getElementById('card'); var util=277*96/25.4 - 6;
+  function caber(){ var c=document.getElementById('card'); var util=(277*96/25.4) * 0.96;   // folga: a impressora mede o texto um pouco diferente da tela
     // tudo no card é medido em "rem": mudar a fonte da página aumenta ou diminui o card inteiro, e a impressão respeita
     var raiz=document.documentElement;
     function medir(f){ raiz.style.fontSize=f+'px'; return c.getBoundingClientRect().height; }
-    var lo=4.5, hi=26;
+    var lo=4.5, hi=18;   // no máximo 1,8x: acima disso valores grandes (R$) não cabem nos quadros
     if (medir(10) <= util) lo=10; else hi=10;
     for (var i=0;i<16;i++){ var m=(lo+hi)/2; if (medir(m) <= util) lo=m; else hi=m; }
     medir(lo); }
