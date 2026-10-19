@@ -2237,43 +2237,44 @@ async function gerarCard(id) {
   .barra{position:sticky;top:0;background:#0F2A3D;color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;font-size:13px;}
   .barra button{background:#0B83B2;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;}
   .folha{width:190mm;margin:14px auto;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.12);}
-  .card{padding:9mm 10mm;transform-origin:top left;}
-  .topo{display:flex;align-items:center;gap:12px;border-bottom:3px solid #0B83B2;padding-bottom:10px;}
-  .topo img{height:34px;}
-  .topo img.setor{height:48px;margin-left:4px;}
+  html{font-size:10px;}
+  .card{padding:9mm 10mm;font-size:1rem;}
+  .topo{display:flex;align-items:center;gap:1.2rem;border-bottom:3px solid #0B83B2;padding-bottom:1rem;}
+  .topo img{height:3.4rem;}
+  .topo img.setor{height:4.8rem;margin-left:0.4rem;}
   .topo img{flex-shrink:0;}
   .topo .t{min-width:0;}
-  .topo .t{font-size:10px;letter-spacing:1.5px;color:#64748B;font-weight:700;}
-  .topo .g{margin-left:auto;font-size:9px;color:#64748B;text-align:right;white-space:nowrap;}
-  .selo{display:inline-block;margin-top:12px;padding:4px 10px;border-radius:20px;color:#fff;font-size:10px;font-weight:700;letter-spacing:.8px;}
-  h1{font-size:19px;margin:6px 0 2px;line-height:1.2;}
-  .org{font-size:11.5px;color:#3F4A59;}
-  .obj{margin-top:10px;font-size:11.5px;line-height:1.45;background:#F4F9FC;border-left:3px solid #0B83B2;padding:8px 10px;border-radius:0 6px 6px 0;}
-  .fatos{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:12px;}
-  .fato{border:1px solid #DCE4EA;border-radius:8px;padding:6px 9px;}
-  .fato span{display:block;font-size:8.5px;text-transform:uppercase;letter-spacing:.6px;color:#64748B;font-weight:700;}
-  .fato b{font-size:12px;}
-  .fato.largo{margin-top:6px;}
-  .fato.largo b{font-size:10.5px;font-weight:600;line-height:1.4;}
+  .topo .t{font-size:1rem;letter-spacing:0.15rem;color:#64748B;font-weight:700;}
+  .topo .g{margin-left:auto;font-size:0.9rem;color:#64748B;text-align:right;white-space:nowrap;}
+  .selo{display:inline-block;margin-top:1.2rem;padding:0.4rem 1rem;border-radius:2rem;color:#fff;font-size:1rem;font-weight:700;letter-spacing:0.08rem;}
+  h1{font-size:1.9rem;margin:0.6rem 0 0.2rem;line-height:1.2;}
+  .org{font-size:1.15rem;color:#3F4A59;}
+  .obj{margin-top:1rem;font-size:1.15rem;line-height:1.45;background:#F4F9FC;border-left:3px solid #0B83B2;padding:0.8rem 1rem;border-radius:0 0.6rem 0.6rem 0;}
+  .fatos{display:grid;grid-template-columns:repeat(3,1fr);gap:0.6rem;margin-top:1.2rem;}
+  .fato{border:1px solid #DCE4EA;border-radius:0.8rem;padding:0.6rem 0.9rem;}
+  .fato span{display:block;font-size:0.85rem;text-transform:uppercase;letter-spacing:0.06rem;color:#64748B;font-weight:700;}
+  .fato b{font-size:1.2rem;}
+  .fato.largo{margin-top:0.6rem;}
+  .fato.largo b{font-size:1.05rem;font-weight:600;line-height:1.4;}
   .fato.dest{background:#0B83B2;border-color:#0B83B2;color:#fff;}
   .fato.dest span{color:#D6EEF7;}
-  h2{font-size:10px;text-transform:uppercase;letter-spacing:1px;color:#0B83B2;margin:14px 0 6px;}
-  .serv{display:grid;grid-template-columns:52% 1fr 42px;align-items:center;gap:8px;font-size:10px;margin-bottom:3px;}
+  h2{font-size:1rem;text-transform:uppercase;letter-spacing:0.1rem;color:#0B83B2;margin:1.4rem 0 0.6rem;}
+  .serv{display:grid;grid-template-columns:52% 1fr 4.2rem;align-items:center;gap:0.8rem;font-size:1rem;margin-bottom:0.3rem;}
   .serv .n{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-  .serv .b{height:8px;background:#E8F2F8;border-radius:4px;overflow:hidden;}
-  .serv .b i{display:block;height:100%;background:#0B83B2;border-radius:4px;}
+  .serv .b{height:0.8rem;background:#E8F2F8;border-radius:0.4rem;overflow:hidden;}
+  .serv .b i{display:block;height:100%;background:#0B83B2;border-radius:0.4rem;}
   .serv .p{text-align:right;font-weight:700;}
-  ul.at{list-style:none;font-size:10px;line-height:1.4;}
-  ul.at li{padding:3px 0 3px 10px;border-left:2px solid #DCE4EA;margin-bottom:2px;}
+  ul.at{list-style:none;font-size:1rem;line-height:1.4;}
+  ul.at li{padding:0.3rem 0 0.3rem 1rem;border-left:2px solid #DCE4EA;margin-bottom:0.2rem;}
   ul.at li.pr{border-left-color:#0B83B2;background:#F4F9FC;font-weight:600;}
-  .obs{font-size:10.5px;line-height:1.45;white-space:pre-wrap;}
-  .links{display:grid;grid-template-columns:1fr 1fr;gap:6px;}
-  .links a{display:block;border:1.5px solid #0B83B2;border-radius:8px;padding:7px 10px;text-decoration:none;color:#0B83B2;font-weight:700;font-size:11.5px;}
-  .links a small{display:block;color:#64748B;font-weight:500;font-size:8.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+  .obs{font-size:1.05rem;line-height:1.45;white-space:pre-wrap;}
+  .links{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:0.6rem;}
+  .links a{display:block;min-width:0;overflow:hidden;border:1.5px solid #0B83B2;border-radius:0.8rem;padding:0.7rem 1rem;text-decoration:none;color:#0B83B2;font-weight:700;font-size:1.15rem;}
+  .links a small{display:block;color:#64748B;font-weight:500;font-size:0.85rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
   .links a.pri{background:#0B83B2;color:#fff;}
   .links a.pri small{color:#D6EEF7;}
-  .sem{font-size:10px;color:#B45309;}
-  .rod{margin-top:14px;padding-top:8px;border-top:1px solid #DCE4EA;font-size:8.5px;color:#94A3B8;display:flex;justify-content:space-between;}
+  .sem{font-size:1rem;color:#B45309;}
+  .rod{margin-top:1.4rem;padding-top:0.8rem;border-top:1px solid #DCE4EA;font-size:0.85rem;color:#94A3B8;display:flex;justify-content:space-between;}
   @media print{ body{background:#fff;} .barra{display:none;} .folha{margin:0;box-shadow:none;width:auto;} }
 </style></head><body>
 <div class="barra"><button onclick="window.print()">Salvar como PDF / imprimir</button><span>No destino, escolha <b>Salvar como PDF</b>. Os botões de link continuam clicáveis no PDF.</span></div>
@@ -2282,7 +2283,7 @@ async function gerarCard(id) {
     <div class="g">Setor de licitações<br>${new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</div>
     <img class="setor" src="${e(logoSetor)}" alt="PDCA"></div>
   <span class="selo" style="background:${interesse[1]}">${interesse[0]}</span>
-  <h1>${e(cidade || "Local a conferir")}${reg ? ` <span style="font-size:12px;color:#64748B;font-weight:500;">· ${reg.km} km de ${e(reg.base)}</span>` : ""}</h1>
+  <h1>${e(cidade || "Local a conferir")}${reg ? ` <span style="font-size:0.6em;color:#64748B;font-weight:500;">· ${reg.km} km de ${e(reg.base)}</span>` : ""}</h1>
   <div class="org">${e(l.orgao || "")}${l.numero ? ` · Nº ${e(l.numero)}` : ""}${modalidade ? ` · ${e(modalidade)}` : ""}</div>
   <div class="obj">${e(l.objeto || "")}</div>
   <div class="fatos">
@@ -2303,7 +2304,7 @@ async function gerarCard(id) {
   <h2>Documentos (clique para abrir)</h2>
   ${links.length ? `<div class="links">${links.map(([t, u, sub], i) => `<a class="${i < 2 && /Edital|Planilha/.test(t) ? "pri" : ""}" href="${e(u)}" target="_blank" rel="noopener">${e(t)}<small>${e(sub && sub !== t.split(" ")[0] ? sub : u)}</small></a>`).join("")}</div>`
     : `<div class="sem">Nenhum link de documento cadastrado para esta licitação.</div>`}
-  ${!planilha && links.length ? `<div class="sem" style="margin-top:6px;">Planilha não publicada separada — veja nos anexos do edital ou no portal.</div>` : ""}
+  ${!planilha && links.length ? `<div class="sem" style="margin-top:0.6rem;">Planilha não publicada separada — veja nos anexos do edital ou no portal.</div>` : ""}
   <div class="rod"><span>${e(l.orgao || "")}</span><span>Confira sempre os dados no edital oficial.</span></div>
 </div></div>
 <script>
@@ -2311,11 +2312,12 @@ async function gerarCard(id) {
   // Pouca informação -> letra maior para ocupar a folha; muita -> letra menor para não passar de 1 página.
   // A largura é compensada (largura / escala) para o card continuar com a largura da folha.
   function caber(){ var c=document.getElementById('card'); var util=277*96/25.4 - 6;
-    var larg=c.parentNode.getBoundingClientRect().width;
-    function medir(k){ c.style.zoom=k; c.style.width=(larg/k)+'px'; return c.getBoundingClientRect().height; }
-    var lo=0.45, hi=2.6;
-    if (medir(1) <= util) lo=1; else hi=1;
-    for (var i=0;i<14;i++){ var m=(lo+hi)/2; if (medir(m) <= util) lo=m; else hi=m; }
+    // tudo no card é medido em "rem": mudar a fonte da página aumenta ou diminui o card inteiro, e a impressão respeita
+    var raiz=document.documentElement;
+    function medir(f){ raiz.style.fontSize=f+'px'; return c.getBoundingClientRect().height; }
+    var lo=4.5, hi=26;
+    if (medir(10) <= util) lo=10; else hi=10;
+    for (var i=0;i<16;i++){ var m=(lo+hi)/2; if (medir(m) <= util) lo=m; else hi=m; }
     medir(lo); }
   (document.fonts ? document.fonts.ready : Promise.resolve()).then(function(){
     var imgs=[].slice.call(document.querySelectorAll('.topo img'));
