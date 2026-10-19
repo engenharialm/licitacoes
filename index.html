@@ -51,6 +51,7 @@
   }
   .brand{display:flex;align-items:center;gap:12px;}
   .brand .logo{width:40px;height:40px;object-fit:contain;flex-shrink:0;}
+  .brand .logo-setor{height:46px;width:auto;flex-shrink:0;margin-left:6px;padding-left:12px;border-left:1px solid var(--border);}
   .brand h1{font-size:1.05rem;font-weight:600;letter-spacing:.2px;color:var(--accent);}
   .brand span{display:block;font-size:.72rem;color:var(--text-dim);font-weight:500;letter-spacing:.5px;}
   .header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -427,6 +428,7 @@
     header{padding:10px 14px;flex-wrap:nowrap;}
     .brand{gap:10px;min-width:0;}
     .brand .logo{width:32px;height:32px;}
+    .brand .logo-setor{height:34px;padding-left:8px;margin-left:2px;}
     .brand h1{font-size:.95rem;}
     .brand span{display:none;}
     #btn-menu{display:inline-flex;margin-left:auto;}
@@ -537,6 +539,7 @@
         <h1>Controle de Licitações</h1>
         <span>LM CONSTRUTORA — PAVIMENTAÇÃO · TERRAPLENAGEM · DRENAGEM</span>
       </div>
+      <img class="logo-setor" src="logo-pdca.png" alt="PDCA — setor de licitações LM" title="Setor de licitações — ciclo PDCA">
     </div>
     <button class="btn btn-ghost btn-sm" id="btn-menu" type="button" aria-expanded="false" aria-controls="header-actions">Menu</button>
     <div class="header-actions" id="header-actions">
@@ -2222,6 +2225,7 @@ async function gerarCard(id) {
   const fato = (rot, val) => `<div class="fato"><span>${rot}</span><b>${val ? e(String(val)) : "—"}</b></div>`;
   const nomeArq = `Card ${cidade || l.orgao || ""} ${l.numero || ""}`.replace(/[\\/:*?"<>|]+/g, "-").replace(/\s+/g, " ").trim().slice(0, 90);
   const logo = new URL("logo-lm.png", location.href).href;
+  const logoSetor = new URL("logo-pdca.png", location.href).href;
 
   w.document.open();
   w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><title>${e(nomeArq)}</title>
@@ -2236,8 +2240,11 @@ async function gerarCard(id) {
   .card{padding:9mm 10mm;transform-origin:top left;}
   .topo{display:flex;align-items:center;gap:12px;border-bottom:3px solid #0B83B2;padding-bottom:10px;}
   .topo img{height:34px;}
+  .topo img.setor{height:48px;margin-left:4px;}
+  .topo img{flex-shrink:0;}
+  .topo .t{min-width:0;}
   .topo .t{font-size:10px;letter-spacing:1.5px;color:#64748B;font-weight:700;}
-  .topo .g{margin-left:auto;font-size:9px;color:#64748B;text-align:right;}
+  .topo .g{margin-left:auto;font-size:9px;color:#64748B;text-align:right;white-space:nowrap;}
   .selo{display:inline-block;margin-top:12px;padding:4px 10px;border-radius:20px;color:#fff;font-size:10px;font-weight:700;letter-spacing:.8px;}
   h1{font-size:19px;margin:6px 0 2px;line-height:1.2;}
   .org{font-size:11.5px;color:#3F4A59;}
@@ -2272,7 +2279,8 @@ async function gerarCard(id) {
 <div class="barra"><button onclick="window.print()">Salvar como PDF / imprimir</button><span>No destino, escolha <b>Salvar como PDF</b>. Os botões de link continuam clicáveis no PDF.</span></div>
 <div class="folha"><div class="card" id="card">
   <div class="topo"><img src="${e(logo)}" alt="LM"><div class="t">FICHA DA LICITAÇÃO</div>
-    <div class="g">LM Construtora · Controle de licitações<br>gerado em ${new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</div></div>
+    <div class="g">Setor de licitações<br>${new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</div>
+    <img class="setor" src="${e(logoSetor)}" alt="PDCA"></div>
   <span class="selo" style="background:${interesse[1]}">${interesse[0]}</span>
   <h1>${e(cidade || "Local a conferir")}${reg ? ` <span style="font-size:12px;color:#64748B;font-weight:500;">· ${reg.km} km de ${e(reg.base)}</span>` : ""}</h1>
   <div class="org">${e(l.orgao || "")}${l.numero ? ` · Nº ${e(l.numero)}` : ""}${modalidade ? ` · ${e(modalidade)}` : ""}</div>
@@ -2299,12 +2307,21 @@ async function gerarCard(id) {
   <div class="rod"><span>${e(l.orgao || "")}</span><span>Confira sempre os dados no edital oficial.</span></div>
 </div></div>
 <script>
-  // garante 1 folha: se passar da altura útil do A4, reduz o card proporcionalmente
-  function caber(){ var c=document.getElementById('card'); var util=277*96/25.4 - 4, k=1; c.style.zoom=1;
-    for(var i=0;i<6;i++){ var h=c.getBoundingClientRect().height; if(h<=util) break; k=k*util/h*0.99; c.style.zoom=k; } }
-  (document.fonts ? document.fonts.ready : Promise.resolve()).then(function(){ var img=document.querySelector('.topo img');
+  // sempre 1 folha A4: acha a maior escala em que o card ainda cabe na altura útil.
+  // Pouca informação -> letra maior para ocupar a folha; muita -> letra menor para não passar de 1 página.
+  // A largura é compensada (largura / escala) para o card continuar com a largura da folha.
+  function caber(){ var c=document.getElementById('card'); var util=277*96/25.4 - 6;
+    var larg=c.parentNode.getBoundingClientRect().width;
+    function medir(k){ c.style.zoom=k; c.style.width=(larg/k)+'px'; return c.getBoundingClientRect().height; }
+    var lo=0.45, hi=2.6;
+    if (medir(1) <= util) lo=1; else hi=1;
+    for (var i=0;i<14;i++){ var m=(lo+hi)/2; if (medir(m) <= util) lo=m; else hi=m; }
+    medir(lo); }
+  (document.fonts ? document.fonts.ready : Promise.resolve()).then(function(){
+    var imgs=[].slice.call(document.querySelectorAll('.topo img'));
+    var falta=imgs.filter(function(i){ return !i.complete; }).length;
     var ok=function(){ caber(); setTimeout(function(){ window.print(); }, 250); };
-    if(img.complete) ok(); else { img.onload=ok; img.onerror=ok; } });
+    if(!falta) ok(); else imgs.forEach(function(i){ if(!i.complete){ i.onload=i.onerror=function(){ if(--falta===0) ok(); }; } }); });
 <\/script>
 </body></html>`);
   w.document.close();

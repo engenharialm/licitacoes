@@ -1,7 +1,7 @@
 // App instalável (PWA) do portal de licitações da LM.
 // Guarda só a "casca" do site (página, mapa, ícones) para abrir rápido; os dados vêm sempre da nuvem.
-const VERSAO = "lm-licitacoes-v1";
-const CASCA = ["./", "index.html", "manifest.webmanifest", "logo-lm.png", "mg-mapa.json", "municipios-mg.json",
+const VERSAO = "lm-licitacoes-v2";
+const CASCA = ["./", "index.html", "manifest.webmanifest", "logo-lm.png", "logo-pdca.png", "mg-mapa.json", "municipios-mg.json",
   "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-32.png"];
 
 self.addEventListener("install", e => {
