@@ -1,6 +1,6 @@
 // App instalável (PWA) do portal de licitações da LM.
 // Guarda só a "casca" do site (página, mapa, ícones) para abrir rápido; os dados vêm sempre da nuvem.
-const VERSAO = "lm-licitacoes-v3";
+const VERSAO = "lm-licitacoes-v4";
 const CASCA = ["./", "index.html", "manifest.webmanifest", "logo-lm.png", "logo-pdca.png", "logo-dpo.png", "mg-mapa.json", "municipios-mg.json",
   "icon-192.png", "icon-512.png", "icon-maskable-512.png", "apple-touch-icon.png", "favicon-32.png"];
 
@@ -22,7 +22,8 @@ self.addEventListener("fetch", e => {
 
   // a página: tenta a versão nova primeiro (as atualizações chegam na hora); sem internet, usa a guardada
   if (req.mode === "navigate" || url.pathname.endsWith("/") || url.pathname.endsWith("index.html")) {
-    e.respondWith(fetch(req)
+    // "no-cache": pergunta sempre ao servidor se a página mudou (nada de versão velha guardada no navegador)
+    e.respondWith(fetch(req.url, { cache: "no-cache", credentials: "same-origin" })
       .then(resp => { const copia = resp.clone(); caches.open(VERSAO).then(c => c.put(req, copia)); return resp; })
       .catch(() => caches.match(req).then(r => r || caches.match("index.html"))));
     return;
