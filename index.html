@@ -538,145 +538,6 @@
     tbody tr{break-inside:avoid;}
   }
 </style>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<style id="tema-lm">
-/* ==========================================================================
-   TEMA LM — mesmo visual do Portal LM (escuro / futurista).
-   Vale só para a tela (@media screen): impressão, PDF, imagem e Excel
-   exportados continuam com o desenho original.
-   ========================================================================== */
-@media screen{
-  :root{
-    color-scheme:dark;
-    --lm-bg:#050B14; --lm-bg2:#0A1626; --lm-glass:rgba(16,32,52,.62); --lm-glass2:rgba(24,46,72,.72);
-    --lm-line:rgba(61,242,255,.16); --lm-line2:rgba(61,242,255,.3); --lm-cyan:#3DF2FF; --lm-acc:#00A3DA;
-    --lm-acc2:#0B83B2; --lm-violet:#7B5CFF; --lm-text:#E6F4FF; --lm-muted:#8AA4BC; --lm-input:rgba(0,0,0,.32);
-    --lm-ok:#2BFF9A; --lm-warn:#FFC14D; --lm-err:#FF6B7A;
-  }
-  html{background:var(--lm-bg)!important}
-  body{background:transparent!important;color:var(--lm-text);font-family:Inter,"Segoe UI",system-ui,sans-serif}
-  body::before{content:"";position:fixed;inset:0;z-index:-2;pointer-events:none;
-    background:radial-gradient(600px 400px at 12% 6%,rgba(0,163,218,.2),transparent 70%),
-               radial-gradient(520px 420px at 92% 94%,rgba(123,92,255,.16),transparent 70%),
-               linear-gradient(180deg,var(--lm-bg) 0%,var(--lm-bg2) 100%)}
-  body::after{content:"";position:fixed;inset:0;z-index:-1;pointer-events:none;opacity:.28;
-    background-image:linear-gradient(var(--lm-line) 1px,transparent 1px),linear-gradient(90deg,var(--lm-line) 1px,transparent 1px);
-    background-size:48px 48px;
-    -webkit-mask-image:radial-gradient(ellipse at 50% 30%,#000 15%,transparent 75%);mask-image:radial-gradient(ellipse at 50% 30%,#000 15%,transparent 75%)}
-  ::selection{background:rgba(61,242,255,.3)}
-  ::-webkit-scrollbar{width:10px;height:10px}
-  ::-webkit-scrollbar-track{background:rgba(0,0,0,.25)}
-  ::-webkit-scrollbar-thumb{background:rgba(61,242,255,.22);border-radius:10px}
-  ::-webkit-scrollbar-thumb:hover{background:rgba(61,242,255,.4)}
-  a{color:var(--lm-cyan)}
-
-  /* botão de voltar ao portal */
-  .lm-portal{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;text-decoration:none;
-    font:600 12px/1 Orbitron,Inter,sans-serif;letter-spacing:.1em;color:var(--lm-cyan)!important;white-space:nowrap;
-    border:1px solid var(--lm-line2);background:rgba(61,242,255,.06);transition:.2s}
-  .lm-portal:hover{background:rgba(61,242,255,.16);box-shadow:0 0 16px rgba(61,242,255,.35)}
-  .lm-portal i{font-style:normal;transition:transform .2s}
-  .lm-portal:hover i{transform:translateX(-3px)}
-}
-@media print{ .lm-portal{display:none!important} }
-@media screen and (prefers-reduced-motion:reduce){ *{transition:none!important;animation:none!important} }
-
-@media screen{
-  :root{
-    --bg:rgba(0,0,0,.28); --bg-elev:rgba(10,22,38,.97); --card:#0C1A2B; --card-hover:#132A42;
-    --border:rgba(61,242,255,.14); --text:#E6F4FF; --text-dim:#A9BED1; --text-faint:#7F97AD;
-    --accent:#18AEE3; --accent-light:#3DF2FF; --accent-dim:rgba(0,163,218,.16);
-    --warning:#FFB547; --danger:#FF6B7A; --info:#7DB2FF; --lime:#8EE04A; --radius:14px;
-  }
-  body{font-family:Inter,'Space Grotesk',sans-serif}
-  ::-webkit-scrollbar-thumb{background:rgba(61,242,255,.22)}
-
-  /* topo e abas */
-  header{background:rgba(5,11,20,.72);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom-color:var(--lm-line)}
-  .brand .logo{background:#fff;border-radius:9px;padding:3px;box-shadow:0 0 14px rgba(0,163,218,.4)}
-  .brand .logo-setor{background:#fff;border-radius:9px;padding:2px 4px;border-left:none;margin-left:4px}
-  .brand h1{font-family:Orbitron,sans-serif;letter-spacing:.06em;
-    background:linear-gradient(90deg,#fff,var(--lm-cyan) 60%,var(--lm-violet));-webkit-background-clip:text;background-clip:text;color:transparent}
-  .brand span{color:var(--lm-muted);letter-spacing:.12em}
-  .tabs{background:rgba(5,11,20,.6);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom-color:var(--lm-line)}
-  .tab{color:var(--lm-muted);transition:.2s}
-  .tab:hover{color:var(--lm-text)}
-  .tab.active{color:var(--lm-cyan);border-bottom-color:var(--lm-cyan);text-shadow:0 0 10px rgba(61,242,255,.55)}
-  .tab .count{background:rgba(61,242,255,.12);color:var(--lm-cyan)}
-  .status-pill{background:rgba(255,255,255,.04)}
-  .status-pill.ok .status-dot{background:var(--lm-ok);box-shadow:0 0 8px var(--lm-ok)}
-
-  /* botões */
-  .btn{transition:.2s}
-  .btn-accent{background:linear-gradient(90deg,var(--lm-acc2),var(--lm-violet));color:#fff;box-shadow:0 0 16px rgba(0,163,218,.3)}
-  .btn-accent:hover{background:linear-gradient(90deg,var(--lm-acc2),var(--lm-violet));filter:brightness(1.15)}
-  .btn-ghost{background:rgba(255,255,255,.03);border-color:var(--lm-line2)}
-  .btn-ghost:hover{background:rgba(61,242,255,.1);border-color:var(--lm-cyan)}
-  .int-btn{background:rgba(255,255,255,.04)}
-  #btn-so-regiao.on{color:#0A1626}
-  .kb-avanca:hover,.cal-dia.sel{color:#fff}
-
-  /* cartões e painéis */
-  .card,.panel{background:var(--lm-glass);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-color:var(--lm-line)}
-  .card .value{font-family:Orbitron,sans-serif;font-weight:700}
-  .card .value.accent{color:var(--lm-cyan);text-shadow:0 0 12px rgba(61,242,255,.35)}
-  .card.clickable{transition:.2s}
-  .card.clickable:hover{background:rgba(24,46,72,.75);border-color:var(--lm-cyan);box-shadow:0 0 22px rgba(0,163,218,.2)}
-  .panel-head{font-family:Orbitron,sans-serif;font-weight:600;letter-spacing:.05em;font-size:.82rem;color:var(--lm-cyan)}
-  .panel-head small{font-family:Inter,sans-serif;letter-spacing:0}
-  thead th{background:#0C1A2B;color:var(--lm-cyan);opacity:.95}
-  tbody tr:hover{background:rgba(61,242,255,.05)}
-  .bar-fill,.serv-bar i,.progress i{background:linear-gradient(90deg,var(--lm-acc2),var(--lm-cyan))}
-
-  /* textos que eram azul-escuro fixo */
-  .decide-item .cid,.cal-item .l1 b,.kb-card .c1 b,.at-item .t1{color:var(--lm-text)}
-  .at-chip.asf{background:rgba(123,92,255,.3);color:#fff}
-
-  /* selos e caixas claras */
-  .badge.grey,.dist.fora,.cmp.sem{background:rgba(255,255,255,.08);color:var(--text-dim)}
-  .badge.nova{background:rgba(255,193,77,.16);color:#FFD27A}
-  .badge.vencida{background:rgba(255,107,122,.16);color:#FF8D99}
-  .badge.accent,.cmp.soma,.atest-cmp.soma{background:rgba(0,163,218,.18)}
-  .cmp.nao,.atest-cmp.nao{color:#FF8D99}
-  .cert-alerta{background:rgba(255,193,77,.1);border-color:rgba(255,193,77,.45);color:#FFD27A}
-  .cert-alerta.vencida{background:rgba(255,107,122,.1);border-color:rgba(255,107,122,.5);color:#FF9AA5}
-  .tab .count.alerta{background:#DC2626;color:#fff}
-  .atest-btn:hover{background:rgba(0,163,218,.26)}
-  .cal-dia.fora{color:#3E5468}
-  .cal-dia.sel .pts i{box-shadow:0 0 0 1.5px #0A1626}
-  .kb-col{background:rgba(0,0,0,.25)}
-  .kb-head .n{background:rgba(255,255,255,.08)}
-  .kb-card{background:#0F2034}
-  .kb-card:hover{box-shadow:0 0 16px rgba(0,163,218,.25)}
-  #btn-lixeira.on{background:#475569}
-
-  /* mapa de Minas */
-  .mapa-caixa{background:radial-gradient(ellipse at 50% 45%,rgba(0,163,218,.12),transparent 70%),rgba(0,0,0,.2)}
-  .mg-estado{fill:rgba(14,34,56,.9);stroke:var(--lm-cyan);filter:drop-shadow(0 0 10px rgba(61,242,255,.35))}
-  .mg-meso{stroke:rgba(61,242,255,.22)}
-  .mk-base-nome{fill:#CFE3F2;stroke:#06101C}
-  .mapa-tip{background:rgba(6,14,26,.95);border:1px solid var(--lm-line2);box-shadow:0 0 18px rgba(0,163,218,.35)}
-
-  /* campos */
-  .toolbar input[type=text],.toolbar select,.field input,.field select,.field textarea,.doc-add input,.reg-row input,.serv-row input,.at-serv input,.at-serv select{
-    background:var(--lm-input);border-color:var(--lm-line2);color:var(--lm-text)}
-  .toolbar input[type=text]:focus,.toolbar select:focus,.field input:focus,.field select:focus,.field textarea:focus{
-    outline:none;border-color:var(--lm-cyan);box-shadow:0 0 0 3px rgba(61,242,255,.15)}
-  select option{background:#0C1A2B;color:var(--lm-text)}
-
-  /* janelas e avisos */
-  .modal-backdrop{background:rgba(2,6,12,.72);backdrop-filter:blur(3px)}
-  .modal{background:rgba(10,22,38,.97);border-color:var(--lm-line2);box-shadow:0 0 60px rgba(0,163,218,.22)}
-  .modal-head h2{font-family:Orbitron,sans-serif;letter-spacing:.05em;color:var(--lm-cyan)}
-  .toast{background:rgba(10,22,38,.96);box-shadow:0 0 22px rgba(0,163,218,.25)}
-
-  .brand .logo-dpo{background:none;padding:0;height:62px;box-shadow:none;filter:drop-shadow(0 0 10px rgba(0,163,218,.25))}
-  /* botão do portal: no celular só a seta */
-  .brand .lm-portal{margin-right:4px}
-  @media (max-width:720px){ .brand .lm-portal{padding:6px 9px} .brand .lm-portal span{display:none} }
-}
-</style>
 </head>
 <body>
 
@@ -684,13 +545,12 @@
 
   <header>
     <div class="brand">
-      <a class="lm-portal" href="https://engenharialm.github.io/portal-lm/" title="Voltar ao Portal LM"><i>←</i><span> Portal</span></a>
       <img class="logo" src="logo-lm.png" alt="LM">
       <div>
         <h1>Controle de Licitações</h1>
         <span>LM CONSTRUTORA — PAVIMENTAÇÃO · TERRAPLENAGEM · DRENAGEM</span>
       </div>
-      <img class="logo-setor logo-dpo" src="logo-dpo-clara.png" alt="Diretoria de Planejamento e Orçamento" title="Diretoria de Planejamento e Orçamento — ciclo PDCA">
+      <img class="logo-setor logo-dpo" src="logo-dpo.png" alt="Diretoria de Planejamento e Orçamento" title="Diretoria de Planejamento e Orçamento — ciclo PDCA">
       <img class="logo-setor logo-pdca-mini" src="logo-pdca.png" alt="Diretoria de Planejamento e Orçamento" title="Diretoria de Planejamento e Orçamento — ciclo PDCA">
     </div>
     <button class="btn btn-ghost btn-sm" id="btn-menu" type="button" aria-expanded="false" aria-controls="header-actions">Menu</button>
