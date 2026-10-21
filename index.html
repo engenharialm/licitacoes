@@ -51,8 +51,12 @@
   }
   .brand{display:flex;align-items:center;gap:12px;}
   .brand .logo{width:40px;height:40px;object-fit:contain;flex-shrink:0;}
-  .brand .logo-setor{height:46px;width:auto;flex-shrink:0;margin-left:6px;padding-left:12px;border-left:1px solid var(--border);}
-  .brand .logo-pdca-mini{display:none;}
+  /* logo animada da Diretoria (LM + ciclo PDCA), a mesma do Portal LM */
+  .brand .setor-anim{display:flex;align-items:center;gap:9px;flex-shrink:0;margin-left:6px;padding-left:12px;border-left:1px solid var(--border);}
+  .brand .setor-marca{width:52px;height:50px;flex-shrink:0;--lmpdca-acc:#0B83B2;}
+  .brand .setor-nome{line-height:1.2;color:#2F3B4C;}
+  .brand .setor-nome span{display:block;font-size:.7rem;font-weight:500;letter-spacing:.3px;color:#2F3B4C;}
+  .brand .setor-nome b{display:block;font-size:.82rem;font-weight:600;}
   .brand h1{font-size:1.05rem;font-weight:600;letter-spacing:.2px;color:var(--accent);}
   .brand span{display:block;font-size:.72rem;color:var(--text-dim);font-weight:500;letter-spacing:.5px;}
   .header-actions{display:flex;align-items:center;gap:10px;flex-wrap:wrap;}
@@ -436,9 +440,9 @@
     header{padding:10px 14px;flex-wrap:nowrap;}
     .brand{gap:10px;min-width:0;}
     .brand .logo{width:32px;height:32px;}
-    .brand .logo-setor{height:34px;padding-left:8px;margin-left:2px;}
-    .brand .logo-dpo{display:none;}
-    .brand .logo-pdca-mini{display:block;}
+    .brand .setor-anim{padding-left:8px;margin-left:2px;}
+    .brand .setor-marca{width:38px;height:36px;}
+    .brand .setor-nome{display:none;}
     .brand h1{font-size:.95rem;}
     .brand span{display:none;}
     #btn-menu{display:inline-flex;margin-left:auto;}
@@ -550,8 +554,10 @@
         <h1>Controle de Licitações</h1>
         <span>LM CONSTRUTORA — PAVIMENTAÇÃO · TERRAPLENAGEM · DRENAGEM</span>
       </div>
-      <img class="logo-setor logo-dpo" src="logo-dpo.png" alt="Diretoria de Planejamento e Orçamento" title="Diretoria de Planejamento e Orçamento — ciclo PDCA">
-      <img class="logo-setor logo-pdca-mini" src="logo-pdca.png" alt="Diretoria de Planejamento e Orçamento" title="Diretoria de Planejamento e Orçamento — ciclo PDCA">
+      <div class="setor-anim" title="Diretoria de Planejamento e Orçamento — ciclo PDCA">
+        <div class="setor-marca" id="logoSetorAnim" role="img" aria-label="Logo PDCA da Diretoria de Planejamento e Orçamento"><img src="logo-pdca.png" alt="" style="width:100%;height:100%;object-fit:contain"></div>
+        <div class="setor-nome"><span>Diretoria de</span><b>Planejamento e Orçamento</b></div>
+      </div>
     </div>
     <button class="btn btn-ghost btn-sm" id="btn-menu" type="button" aria-expanded="false" aria-controls="header-actions">Menu</button>
     <div class="header-actions" id="header-actions">
@@ -4508,6 +4514,14 @@ if ("serviceWorker" in navigator && location.protocol === "https:") {
     if (ios) toast("No iPhone: toque em Compartilhar (quadrado com a seta ↑) e depois em “Adicionar à Tela de Início”.");
     else toast("No menu do navegador (⋮), escolha “Instalar app” ou “Adicionar à tela inicial”.");
   });
+})();
+
+/* logo animada no topo (toca em ciclo, com pausa longa na logo completa) */
+(function () {
+  const s = document.createElement("script");
+  s.src = "logo-anim/logo-anim.js";
+  s.onload = () => { try { LogoPDCA.montar(document.getElementById("logoSetorAnim"), { nome: false, loop: true, pausa: 8, base: "logo-anim/" }); } catch (e) { console.warn("logo animada:", e); } };
+  document.head.appendChild(s);
 })();
 
 init();
