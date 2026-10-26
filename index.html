@@ -373,6 +373,21 @@
   .at-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;}
   .at-chip{font-size:.68rem;padding:2px 8px;border-radius:999px;background:var(--accent-dim);color:var(--accent);font-weight:600;white-space:nowrap;}
   .at-chip.asf{background:#0F2A3D;color:#fff;}
+  .at-total{border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:10px;background:var(--accent-dim);}
+  .at-total .tt{font-weight:700;font-size:.85rem;}
+  .at-total .tt b{font-size:1.05rem;color:var(--accent);margin-right:10px;white-space:nowrap;}
+  .at-total table{width:100%;border-collapse:collapse;margin-top:8px;font-size:.76rem;}
+  .at-total td{padding:4px 6px;border-top:1px solid var(--border);vertical-align:top;}
+  .at-total td.q{text-align:right;white-space:nowrap;font-weight:700;}
+  .at-total tr.fora td{opacity:.55;}
+  .at-achado{font-size:.72rem;margin-top:5px;color:var(--text-dim);}
+  @media (max-width:640px){
+    .at-total tr{display:grid;grid-template-columns:minmax(0,1fr) auto;border-top:1px solid var(--border);}
+    .at-total td{border-top:none;}
+    .at-total td:first-child{grid-column:1/-1;padding-bottom:0;}
+    .at-total td:empty{display:none;}
+  }
+  .at-achado b{color:var(--accent);}
   .at-serv-cab, .at-serv{display:grid;grid-template-columns:minmax(0,1fr) 70px 120px 160px 34px;gap:6px;align-items:center;}
   .at-serv-cab{font-size:.66rem;text-transform:uppercase;color:var(--text-faint);font-weight:700;margin-bottom:4px;}
   .at-serv{margin-bottom:5px;}
@@ -853,7 +868,7 @@
             <button class="btn btn-ghost btn-sm" id="at-add" type="button">+ Novo atestado</button>
           </span>
         </div>
-        <div class="panel-body" id="at-lista"></div>
+        <div class="panel-body"><div id="at-total"></div><div id="at-lista"></div></div>
       </div>
     </section>
 
@@ -3668,11 +3683,29 @@ function renderAtestados() {
   const lista = atestados.filter(a => !busca || norm([a.contratante, a.municipio, a.objeto, a.obs, ...(a.servicos || []).map(s => s.descricao)].join(" ")).includes(busca))
     .sort((a, b) => (a.somar === false) - (b.somar === false) || (b.fim || b.inicio || "").localeCompare(a.fim || a.inicio || ""));
   document.getElementById("at-resumo").textContent = busca ? `${lista.length} de ${atestados.length}` : "";
+  // total do item pesquisado: soma das linhas de serviço cuja descrição tem o texto buscado
+  const achadosDe = a => busca ? (a.servicos || []).filter(s => norm(s.descricao || "").includes(busca) && Number(s.quantidade) > 0) : [];
+  const ordemAt = (a, b) => (a.somar === false || a.titular === "rt") - (b.somar === false || b.titular === "rt");
+  const comItem = lista.filter(a => achadosDe(a).length).sort(ordemAt);
+  const totais = new Map(), totaisFora = new Map();
+  for (const a of comItem) for (const s of achadosDe(a)) {
+    const u = normUnidade(s.unidade) || "?", alvo = a.somar === false || a.titular === "rt" ? totaisFora : totais;
+    alvo.set(u, (alvo.get(u) || 0) + Number(s.quantidade));
+  }
+  const fmtTot = m => [...m.entries()].sort((x, y) => y[1] - x[1]).map(([u, q]) => `${fmtQtd(q)} ${escapeHtml(u)}`);
+  document.getElementById("at-total").innerHTML = comItem.length ? `<div class="at-total">
+    <div class="tt">Total de “${escapeHtml(document.getElementById("at-busca").value.trim())}”: ${fmtTot(totais).map(t => `<b>${t}</b>`).join("") || "<b>—</b>"}
+      <span class="muted small">em ${comItem.filter(a => !(a.somar === false || a.titular === "rt")).length} atestado(s) da LM${totaisFora.size ? ` · fora da soma (RT ou repetidos): ${fmtTot(totaisFora).join(" · ")}` : ""}</span></div>
+    <table>${comItem.map(a => { const fora = a.somar === false || a.titular === "rt"; return achadosDe(a).map((s, i) => `<tr class="${fora ? "fora" : ""}">
+      <td>${i ? "" : `<b>${escapeHtml(a.contratante || "—")}</b>${a.municipio ? ` <span class="muted">· ${escapeHtml(a.municipio)}</span>` : ""}${fora ? ` <span class="muted">· fora da soma</span>` : ""}`}</td>
+      <td>${escapeHtml(s.descricao || "")}</td><td class="q">${fmtQtd(s.quantidade)} ${escapeHtml(normUnidade(s.unidade))}</td></tr>`).join(""); }).join("")}</table>
+  </div>` : "";
   document.getElementById("at-lista").innerHTML = lista.length ? lista.map(a => `
     <div class="at-item" data-at="${escapeHtml(a.id)}" title="Clique para ver todos os serviços">
       <div style="min-width:0;">
         <div class="t1">${escapeHtml(a.contratante || "—")}<small>${escapeHtml([a.municipio, periodoAt(a), a.tipoDoc === "atestado_parcial" ? "PARCIAL" : a.tipoDoc === "cat" ? "CAT" : "", a.somar === false ? "fora da soma" : "", a.titular === "rt" ? "SÓ ACERVO DO RT (outra empresa)" : ""].filter(Boolean).join(" · "))}</small></div>
         <div class="obj clamp" style="-webkit-line-clamp:2;">${escapeHtml(a.objeto || "")}</div>
+        ${achadosDe(a).length ? `<div class="at-achado">${achadosDe(a).map(s => `${escapeHtml(s.descricao || "")}: <b>${fmtQtd(s.quantidade)} ${escapeHtml(normUnidade(s.unidade))}</b>`).join(" · ")}</div>` : ""}
         <div class="at-chips">${resumoServicos(a).slice(0, 8).map(x => `<span class="at-chip ${CAT_ASFALTO.has(x.c) ? "asf" : ""}">${escapeHtml(CATEGORIAS_SERV[x.c].split(" (")[0].split(" /")[0])} ${fmtQtd(x.q)} ${escapeHtml(x.u)}</span>`).join("")}</div>
       </div>
       <div style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">
