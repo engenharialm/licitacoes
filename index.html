@@ -3261,20 +3261,41 @@ function exportarExcel() {
 // os processos são os itens "em análise / em andamento" da carteira (coleção licitacoes_ganhas)
 const FASES_AND = [
   { k: "orcamento", nome: "Orçamento em andamento", cor: "#94A3B8" },
+  { k: "esclarecimento", nome: "Esclarecimento", cor: "#0D9488", extra: true },
+  { k: "impugnacao", nome: "Impugnação", cor: "#EA580C", extra: true },
   { k: "proposta", nome: "Proposta enviada", cor: "#0EA5E9" },
   { k: "analise_proposta", nome: "Análise de proposta", cor: "#0B83B2" },
   { k: "diligencia", nome: "Diligência", cor: "#D97706" },
   { k: "habilitacao", nome: "Análise de documentos", cor: "#7C3AED" },
   { k: "recurso", nome: "Recurso / contrarrecurso", cor: "#DC2626" },
+  { k: "suspensa", nome: "Suspensa", cor: "#475569", extra: true },
   { k: "homologacao", nome: "Homologação / contrato", cor: "#4D7C0F" }
 ];
 const FINAIS_AND = { ganho: "Ganhamos (vai para contratos ganhos)", perdido: "Perdemos / encerrado" };
+// esclarecimento, impugnação e suspensa são desvios: o ▶ das outras fases pula essas colunas;
+// nelas o ▶ volta para a fase em que o processo estava antes
+function proximaFase(g) {
+  const atual = faseDe(g);
+  if (FASES_AND.find(f => f.k === atual)?.extra) return faseAntesDe(g, atual) || (atual === "suspensa" ? "proposta" : "orcamento");
+  const i = FASES_AND.findIndex(f => f.k === atual);
+  return FASES_AND.slice(i + 1).find(f => !f.extra)?.k || null;
+}
+// fase de onde o processo veio antes de entrar na fase extra (pelo histórico)
+function faseAntesDe(g, fase) {
+  const h = [...(g.historico || [])].reverse().find(x => x.fase === fase && /^Fase: /.test(x.texto || ""));
+  const nome = h?.texto.slice(6).split(" → ")[0];
+  const f = FASES_AND.find(x => x.nome === nome && !x.extra);
+  return f?.k || null;
+}
 const nomeFase = k => FASES_AND.find(f => f.k === k)?.nome || FINAIS_AND[k] || k;
 const emAndamento = () => ganhas.filter(g => g.situacao === "ANALISE" || g.situacao === "ANDAMENTO");
 // itens antigos não têm fase: deduz pelo texto da etapa / observação
 function faseDe(g) {
   if (g.fase && FASES_AND.some(f => f.k === g.fase)) return g.fase;
   const t = norm((g.etapa || "") + " " + (g.obs || ""));
+  if (/suspens/.test(t)) return "suspensa";
+  if (/impugna/.test(t)) return "impugnacao";
+  if (/esclarec/.test(t)) return "esclarecimento";
   if (/recurso/.test(t)) return "recurso";
   if (/diligenc/.test(t)) return "diligencia";
   if (/habilita|documen/.test(t)) return "habilitacao";
@@ -3313,7 +3334,7 @@ function renderAndamento() {
           ${g.etapa ? `<div class="et">${escapeHtml(g.etapa)}</div>` : ""}
           <div class="rod">
             <span>${g.prazo ? `${fmtDateTime(g.prazo).slice(0, 10)} ${prazoBadge({ dataSessao: g.prazo })}` : `<span class="muted">sem prazo</span>`}</span>
-            ${i < FASES_AND.length - 1 ? `<button class="kb-avanca" type="button" data-and-av="${escapeHtml(g.id)}" title="Avançar para: ${escapeHtml(FASES_AND[i + 1].nome)}">▶</button>` : ""}
+            ${(p => p ? `<button class="kb-avanca" type="button" data-and-av="${escapeHtml(g.id)}" title="${f.extra ? "Voltar para" : "Avançar para"}: ${escapeHtml(nomeFase(p))}">▶</button>` : "")(proximaFase(g))}
           </div>
           <div class="muted small ${dias > 7 ? "velho" : ""}" style="margin-top:4px;">${dias === null ? "" : dias === 0 ? "atualizado hoje" : `atualizado há ${dias} dia${dias > 1 ? "s" : ""}`}</div>
         </div>`;
@@ -4573,8 +4594,8 @@ document.addEventListener("click", e => {
   const andAv = e.target.closest("[data-and-av]");
   if (andAv) {
     const g = ganhas.find(x => x.id === andAv.dataset.andAv);
-    const i = FASES_AND.findIndex(f => f.k === faseDe(g));
-    if (g && i >= 0 && i < FASES_AND.length - 1) moverFase(g.id, FASES_AND[i + 1].k);
+    const p = g && proximaFase(g);
+    if (p) moverFase(g.id, p);
     return;
   }
   const andCard = e.target.closest("[data-and]");
