@@ -361,6 +361,16 @@
   .kb-avanca{border:1px solid var(--border);background:var(--bg);border-radius:6px;padding:2px 8px;cursor:pointer;font-size:.72rem;color:var(--accent);font-weight:700;}
   .kb-avanca:hover{background:var(--accent);color:#fff;}
   .and-rel{white-space:pre-wrap;font-family:inherit;font-size:.8rem;line-height:1.5;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:340px;overflow:auto;margin:0;}
+  .and-rec{list-style:none;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
+  .and-rec li{display:flex;gap:8px;align-items:center;border:1px solid var(--border);border-left:3px solid #DC2626;border-radius:6px;padding:6px 10px;font-size:.78rem;background:var(--bg);}
+  .and-rec li.contra{border-left-color:#7C3AED;}
+  .and-rec li.decisao{border-left-color:#4D7C0F;}
+  .and-rec li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .and-rec li small{color:var(--text-faint);}
+  .and-rec-add{display:grid;grid-template-columns:150px minmax(0,1fr) auto;gap:8px;align-items:center;}
+  .and-rec-add input,.and-rec-add select{border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-family:inherit;font-size:.78rem;min-width:0;background:var(--card);color:inherit;}
+  .and-rec-add .arq{grid-column:1/-1;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px;}
+  @media (max-width:640px){ .and-rec-add{grid-template-columns:1fr auto;} .and-rec-add select{grid-column:1/-1;} .and-rec-add .arq{grid-template-columns:1fr;} }
   .and-hist{list-style:none;display:flex;flex-direction:column;gap:6px;max-height:240px;overflow:auto;}
   .and-hist li{border-left:3px solid var(--accent);padding:4px 10px;font-size:.78rem;background:var(--bg);border-radius:0 6px 6px 0;}
   .and-hist li small{display:block;color:var(--text-faint);font-size:.68rem;}
@@ -1238,12 +1248,30 @@
           <textarea id="and-m-nota" rows="2" placeholder="Ex: Enviamos a resposta da diligência por e-mail"></textarea>
         </div>
       </div>
+      <div id="and-m-rec-box" hidden>
+        <div class="modal-section-title"><span>Recursos e contrarrecursos</span><span class="muted small" style="text-transform:none;letter-spacing:0;">PDF até 40 MB ou link</span></div>
+        <ul class="and-rec" id="and-m-rec"></ul>
+        <div class="and-rec-add">
+          <select id="and-m-rec-tipo">
+            <option value="recurso">Recurso</option>
+            <option value="contra">Contrarrecurso</option>
+            <option value="decisao">Decisão do recurso</option>
+          </select>
+          <input type="text" id="and-m-rec-emp" placeholder="De quem? (ex.: LM, Construtora X)">
+          <button class="btn btn-ghost btn-sm" id="and-m-rec-add" type="button">Anexar</button>
+          <div class="arq">
+            <input type="file" id="and-m-rec-pdf" accept="application/pdf,.pdf">
+            <input type="url" id="and-m-rec-url" placeholder="ou cole o link (portal, Drive…)">
+          </div>
+        </div>
+      </div>
       <div class="modal-section-title"><span>Histórico</span></div>
       <ul class="and-hist" id="and-m-hist"></ul>
     </div>
     <div class="modal-foot">
       <div style="display:flex;gap:8px;flex-wrap:wrap;">
         <button class="btn btn-ghost btn-sm" id="and-m-lic" type="button" hidden>Ver licitação</button>
+        <button class="btn btn-ghost btn-sm" id="and-m-card" type="button" hidden title="Resumo de 1 página do recurso, com os links dos documentos — salve como PDF">Card do recurso</button>
         <button class="btn btn-danger-ghost btn-sm" id="and-m-excluir" type="button">Tirar do quadro</button>
       </div>
       <div style="display:flex;gap:10px;">
@@ -1638,8 +1666,36 @@ const store = {
   async setMeta(m, nome = "pncp") {
     if (useFirebase) return withTimeout(() => fs.setDoc(fs.doc(db, META_COL, nome), m));
     localStorage.setItem(LS_META + (nome === "pncp" ? "" : "_" + nome), JSON.stringify(m));
+  },
+  async removeMeta(nome) {
+    if (useFirebase) return withTimeout(() => fs.deleteDoc(fs.doc(db, META_COL, nome)));
+    localStorage.removeItem(LS_META + "_" + nome);
   }
 };
+
+// link de um PDF de recurso (vai no Card do recurso): ?pdf=recpdf-…&partes=N&nome=…
+// abre só o arquivo, sem carregar o resto do site
+const LINK_PDF = new URLSearchParams(location.search);
+if (LINK_PDF.get("pdf")) {
+  const caixa = msg => { document.body.innerHTML = `<div style="font-family:Montserrat,sans-serif;padding:30px;max-width:560px;margin:auto;line-height:1.5;"></div>`; document.body.firstChild.textContent = msg; return document.body.firstChild; };
+  caixa("Abrindo o arquivo…");
+  try {
+    const doc = LINK_PDF.get("pdf"), n = Math.min(80, Number(LINK_PDF.get("partes")) || 1);
+    if (!/^recpdf-[\w-]+$/.test(doc)) throw new Error("Link inválido.");
+    const partes = await Promise.all(Array.from({ length: n }, (_, i) => store.getMeta(`${doc}-${i}`)));
+    if (partes.some(d => !d?.base64)) throw new Error("Arquivo não encontrado. Ele pode ter sido retirado do processo.");
+    const url = URL.createObjectURL(new Blob(partes.map(d => Uint8Array.from(atob(d.base64), c => c.charCodeAt(0))), { type: "application/pdf" }));
+    const nome = (LINK_PDF.get("nome") || "recurso.pdf").replace(/[\\/:*?"<>|]+/g, "-");
+    const box = caixa(nome + " — ");
+    const a = document.createElement("a"); a.href = url; a.download = nome; a.textContent = "baixar o PDF"; box.appendChild(a);
+    // mostra o PDF na própria página (no celular, onde o leitor embutido não abre, fica o link de baixar)
+    box.style.maxWidth = "none"; box.style.padding = "10px 16px";
+    const f = document.createElement("iframe"); f.src = url; f.title = nome;
+    f.style.cssText = "display:block;width:100%;height:calc(100vh - 60px);border:0;margin-top:8px;";
+    box.appendChild(f);
+  } catch (e) { caixa(e.message || "Não foi possível abrir o arquivo."); }
+  await new Promise(() => {});
+}
 
 // carteira de contratos ganhos e processos em acompanhamento (aba "Ganhas pela LM")
 const COL_GANHAS = "licitacoes_ganhas";
@@ -3412,12 +3468,166 @@ function abrirAndamento(id) {
   v("and-m-ref", g.referencia); v("and-m-valor", g.valor); v("and-m-desc", g.desconto); v("and-m-pos", g.posicao); v("and-m-nota", "");
   v("and-m-nome", g.nomeRelatorio || ""); document.getElementById("and-m-nome").placeholder = g.local || "Ex: Nazareno CE 04/2026";
   v("and-m-privado", ehPrivado(g) ? "1" : ""); v("and-m-obs", g.obs);
-  const hist = [...(g.historico || [])].reverse();
-  document.getElementById("and-m-hist").innerHTML = hist.length ? hist.map(h => `<li><small>${new Date(h.em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}${h.fase ? " · " + escapeHtml(nomeFase(h.fase)) : ""}</small>${escapeHtml(h.texto)}</li>`).join("")
-    : `<li><small>sem histórico</small>${escapeHtml(g.obs || "As anotações vão aparecer aqui.")}</li>`;
+  renderHistAndamento(g);
+  renderRecursosModal(g);
   document.getElementById("and-m-lic").hidden = !g.licitacaoId || !licitacoes.some(l => l.id === g.licitacaoId);
   document.getElementById("modal-and").classList.add("open");
 }
+function renderHistAndamento(g) {
+  const hist = [...(g.historico || [])].reverse();
+  document.getElementById("and-m-hist").innerHTML = hist.length ? hist.map(h => `<li><small>${new Date(h.em).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}${h.fase ? " · " + escapeHtml(nomeFase(h.fase)) : ""}</small>${escapeHtml(h.texto)}</li>`).join("")
+    : `<li><small>sem histórico</small>${escapeHtml(g.obs || "As anotações vão aparecer aqui.")}</li>`;
+}
+
+/* recursos e contrarrecursos do processo (PDF guardado em partes no banco, como os atestados) */
+const TIPOS_REC = { recurso: "Recurso", contra: "Contrarrecurso", decisao: "Decisão do recurso" };
+const linkRecurso = r => r.url || `${location.origin}${location.pathname}?pdf=${encodeURIComponent(r.doc)}&partes=${r.partes}&nome=${encodeURIComponent(r.nome || "recurso.pdf")}`;
+// a parte de recursos aparece na fase Recurso ou quando o processo já tem algum documento anexado
+function renderRecursosModal(g) {
+  const lista = andEditId ? g.recursos || [] : [];
+  const mostra = !!andEditId && (document.getElementById("and-m-fase").value === "recurso" || lista.length > 0);
+  document.getElementById("and-m-rec-box").hidden = !mostra;
+  document.getElementById("and-m-card").hidden = !mostra;
+  document.getElementById("and-m-rec").innerHTML = lista.length ? lista.map(r => `<li class="${escapeHtml(r.tipo)}">
+      <b>${escapeHtml(TIPOS_REC[r.tipo] || r.tipo)}</b>
+      <span class="nm">${escapeHtml(r.empresa || "")} <small>· ${new Date(r.em).toLocaleDateString("pt-BR")}${r.nome ? " · " + escapeHtml(r.nome) : ""}</small></span>
+      <button class="icon-btn" type="button" data-rec-abrir="${escapeHtml(r.id)}">${r.url ? "Abrir link" : "Baixar PDF"}</button>
+      <button class="icon-btn" type="button" data-rec-del="${escapeHtml(r.id)}" title="Retirar este documento">✕</button>
+    </li>`).join("") : `<li style="border-left-color:var(--border);"><span class="muted">Nenhum documento anexado ainda.</span></li>`;
+}
+async function anexarRecurso() {
+  const g = ganhas.find(x => x.id === andEditId);
+  if (!g) return;
+  const tipo = document.getElementById("and-m-rec-tipo").value;
+  const empresa = document.getElementById("and-m-rec-emp").value.trim();
+  const arquivo = document.getElementById("and-m-rec-pdf").files[0];
+  const url = document.getElementById("and-m-rec-url").value.trim();
+  if (!arquivo && !url) { toast("Escolha o PDF ou cole o link.", true); return; }
+  if (!arquivo && !safeUrl(url)) { toast("O link precisa começar com http:// ou https://", true); return; }
+  if (arquivo && arquivo.size > ATEST_PDF_MAX) { toast("PDF acima de 40 MB.", true); return; }
+  if (!requireUnlock()) return;
+  const btn = document.getElementById("and-m-rec-add");
+  btn.disabled = true;
+  try {
+    const agora = new Date().toISOString();
+    const r = { id: "rec-" + Date.now().toString(36), tipo, empresa, em: agora };
+    if (arquivo) {
+      r.doc = `recpdf-${g.id}-${r.id}`;
+      r.partes = await salvarArquivoPartes(r.doc, arquivo, (i, n) => { btn.textContent = `Enviando ${i}/${n}…`; });
+      r.nome = arquivo.name; r.tam = arquivo.size;
+    } else r.url = url;
+    const recursos = [...(g.recursos || []), r];
+    const historico = [...(g.historico || []), { em: agora, fase: faseDe(g), texto: `Anexado: ${TIPOS_REC[tipo]}${empresa ? " — " + empresa : ""}` }];
+    await storeGanhas.save(g.id, { recursos, historico, atualizadoEm: agora });
+    Object.assign(g, { recursos, historico, atualizadoEm: agora });
+    ["and-m-rec-emp", "and-m-rec-pdf", "and-m-rec-url"].forEach(id => { document.getElementById(id).value = ""; });
+    renderRecursosModal(g); renderHistAndamento(g); renderGanhas();
+    toast(`${TIPOS_REC[tipo]} anexado.`);
+  } catch (e) { toast(e.message || "Erro ao anexar.", true); }
+  finally { btn.disabled = false; btn.textContent = "Anexar"; }
+}
+async function abrirRecurso(rid) {
+  const g = ganhas.find(x => x.id === andEditId), r = g?.recursos?.find(x => x.id === rid);
+  if (!r) return;
+  if (r.url) { window.open(r.url, "_blank", "noopener"); return; }
+  try { toast("Baixando…"); salvarBlob(await lerArquivoPartes(r.doc, r.partes), r.nome || "recurso.pdf"); }
+  catch (e) { toast(e.message || "Erro ao baixar.", true); }
+}
+async function removerRecurso(rid) {
+  const g = ganhas.find(x => x.id === andEditId), r = g?.recursos?.find(x => x.id === rid);
+  if (!r || !confirm(`Retirar "${TIPOS_REC[r.tipo]}${r.empresa ? " — " + r.empresa : ""}" deste processo?`) || !requireUnlock()) return;
+  try {
+    const agora = new Date().toISOString();
+    const recursos = g.recursos.filter(x => x.id !== rid);
+    const historico = [...(g.historico || []), { em: agora, fase: faseDe(g), texto: `Retirado: ${TIPOS_REC[r.tipo]}${r.empresa ? " — " + r.empresa : ""}` }];
+    await storeGanhas.save(g.id, { recursos, historico, atualizadoEm: agora });
+    Object.assign(g, { recursos, historico, atualizadoEm: agora });
+    if (r.doc) await Promise.all(Array.from({ length: r.partes || 0 }, (_, i) => store.removeMeta(`${r.doc}-${i}`))).catch(() => {});
+    renderRecursosModal(g); renderHistAndamento(g); renderGanhas();
+  } catch (e) { toast(e.message || "Erro ao retirar.", true); }
+}
+// card de 1 página com a situação do recurso e os links dos documentos
+function gerarCardRecurso(id) {
+  const g = ganhas.find(x => x.id === id);
+  if (!g) return;
+  const w = window.open("", "_blank");
+  if (!w) { toast("O navegador bloqueou a nova janela. Libere pop-ups para este site.", true); return; }
+  const e = escapeHtml;
+  const ordemTipos = Object.keys(TIPOS_REC);
+  const recs = [...(g.recursos || [])].sort((a, b) => ordemTipos.indexOf(a.tipo) - ordemTipos.indexOf(b.tipo) || a.em.localeCompare(b.em));
+  const hist = [...(g.historico || [])].reverse().slice(0, 6);
+  const cores = { recurso: "#DC2626", contra: "#7C3AED", decisao: "#4D7C0F" };
+  const fato = (rot, val) => `<div class="fato"><span>${rot}</span><b>${val ? e(String(val)) : "—"}</b></div>`;
+  const nomeArq = `Recurso ${nomeRelatorio(g)}`.replace(/[\\/:*?"<>|]+/g, "-").slice(0, 90);
+  const desc = g.desconto !== null && g.desconto !== undefined && g.desconto !== "" ? pct(g.desconto) : "";
+  const pos = g.posicao ? (/^\d+$/.test(g.posicao.trim()) ? g.posicao.trim() + "º" : g.posicao) : "";
+  w.document.write(`<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${e(nomeArq)}</title>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  @page{size:A4;margin:12mm;}
+  *{box-sizing:border-box;margin:0;padding:0;}
+  body{font-family:'Montserrat',Arial,sans-serif;color:#1F2937;background:#E9EEF2;-webkit-print-color-adjust:exact;print-color-adjust:exact;}
+  .barra{position:sticky;top:0;background:#0F2A3D;color:#fff;padding:10px 16px;display:flex;gap:12px;align-items:center;font-size:13px;flex-wrap:wrap;}
+  .barra button{background:#0B83B2;color:#fff;border:0;border-radius:8px;padding:8px 14px;font-family:inherit;font-weight:600;font-size:13px;cursor:pointer;}
+  .folha{max-width:186mm;margin:14px auto;background:#fff;box-shadow:0 4px 20px rgba(0,0,0,.12);padding:9mm 10mm;}
+  .topo{display:flex;align-items:center;gap:12px;border-bottom:3px solid #DC2626;padding-bottom:10px;}
+  .topo img{height:38px;} .topo img.setor{height:64px;margin-left:auto;}
+  .topo .t{font-size:10px;letter-spacing:1.5px;color:#64748B;font-weight:700;}
+  .selo{display:inline-block;margin-top:14px;padding:4px 12px;border-radius:20px;color:#fff;font-size:11px;font-weight:700;letter-spacing:1px;background:#DC2626;}
+  h1{font-size:22px;margin:8px 0 2px;line-height:1.2;}
+  .org{font-size:13px;color:#3F4A59;}
+  .sit{margin-top:12px;font-size:14px;line-height:1.45;background:#FEF2F2;border-left:3px solid #DC2626;padding:9px 12px;border-radius:0 7px 7px 0;font-weight:600;}
+  .fatos{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:7px;margin-top:12px;}
+  .fato{border:1px solid #DCE4EA;border-radius:8px;padding:6px 9px;min-width:0;overflow-wrap:break-word;}
+  .fato span{display:block;font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:#64748B;font-weight:700;}
+  .fato b{font-size:13px;}
+  h2{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:#DC2626;margin:16px 0 7px;}
+  .docs{display:flex;flex-direction:column;gap:6px;}
+  .docs a{display:flex;gap:10px;align-items:center;border:1.5px solid var(--c);border-left-width:6px;border-radius:8px;padding:8px 12px;text-decoration:none;color:#1F2937;}
+  .docs a b{color:var(--c);font-size:13px;white-space:nowrap;}
+  .docs a span{flex:1;min-width:0;font-size:12px;}
+  .docs a small{color:#64748B;font-size:10px;display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .docs a i{font-style:normal;font-weight:700;color:var(--c);font-size:12px;white-space:nowrap;}
+  .sem{font-size:12px;color:#B45309;}
+  ul.h{list-style:none;font-size:11.5px;line-height:1.4;}
+  ul.h li{padding:3px 0 3px 10px;border-left:2px solid #DCE4EA;margin-bottom:3px;}
+  ul.h li small{color:#64748B;margin-right:6px;}
+  .rod{margin-top:16px;padding-top:7px;border-top:1px solid #DCE4EA;font-size:9px;color:#94A3B8;display:flex;justify-content:space-between;gap:10px;}
+  @media print{ body{background:#fff;} .barra{display:none;} .folha{margin:0;box-shadow:none;max-width:none;} }
+  @media (max-width:600px){ .fatos{grid-template-columns:1fr 1fr;} .folha{padding:16px;margin:8px;} .topo img.setor{height:44px;} .docs a{flex-wrap:wrap;} }
+</style></head><body>
+<div class="barra"><button onclick="window.print()">Salvar como PDF / imprimir</button><span>No destino, escolha <b>Salvar como PDF</b>. Os links dos documentos continuam clicáveis.</span></div>
+<div class="folha">
+  <div class="topo"><img src="${e(new URL("logo-lm.png", location.href).href)}" alt="LM"><div class="t">STATUS DO RECURSO<br><span style="font-weight:500;letter-spacing:0;">${new Date().toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</span></div>
+    <img class="setor" src="${e(new URL("logo-dpo.png", location.href).href)}" alt="Diretoria de Planejamento e Orçamento"></div>
+  <span class="selo">${e(nomeFase(faseDe(g)).toUpperCase())}</span>
+  <h1>${e(nomeRelatorio(g))}</h1>
+  <div class="org">${e([g.cliente, g.local !== nomeRelatorio(g) ? g.local : ""].filter(Boolean).join(" · "))}</div>
+  ${g.etapa ? `<div class="sit">${e(g.etapa)}</div>` : ""}
+  <div class="fatos">
+    ${fato("Próximo prazo", g.prazo ? fmtDateTime(g.prazo) : "")}
+    ${fato("Nossa posição", pos)}
+    ${fato("Nosso valor", g.valor > 0 ? fmtMoney(g.valor) : "")}
+    ${fato("Nosso desconto", desc)}
+  </div>
+  <h2>Documentos do recurso (clique para abrir)</h2>
+  ${recs.length ? `<div class="docs">${recs.map(r => `<a href="${e(linkRecurso(r))}" target="_blank" rel="noopener" style="--c:${cores[r.tipo] || "#0B83B2"}">
+      <b>${e(TIPOS_REC[r.tipo] || r.tipo)}</b><span>${e(r.empresa || "—")}<small>${new Date(r.em).toLocaleDateString("pt-BR")}${r.nome ? " · " + e(r.nome) : r.url ? " · " + e(r.url) : ""}</small></span><i>Abrir ↗</i></a>`).join("")}</div>`
+    : `<div class="sem">Nenhum recurso ou contrarrecurso anexado ainda.</div>`}
+  ${hist.length ? `<h2>Últimas movimentações</h2><ul class="h">${hist.map(h => `<li><small>${new Date(h.em).toLocaleDateString("pt-BR")}</small>${e(h.texto)}</li>`).join("")}</ul>` : ""}
+  <div class="rod"><span>LM Construtora — Controle de Licitações</span><span>Os links abrem os arquivos guardados no sistema.</span></div>
+</div></body></html>`);
+  w.document.close();
+}
+document.getElementById("and-m-rec-add").addEventListener("click", anexarRecurso);
+document.getElementById("and-m-rec").addEventListener("click", ev => {
+  const a = ev.target.closest("[data-rec-abrir]"), d = ev.target.closest("[data-rec-del]");
+  if (a) abrirRecurso(a.dataset.recAbrir);
+  if (d) removerRecurso(d.dataset.recDel);
+});
+document.getElementById("and-m-fase").addEventListener("change", () => { const g = ganhas.find(x => x.id === andEditId); if (g) renderRecursosModal(g); });
+document.getElementById("and-m-card").addEventListener("click", () => gerarCardRecurso(andEditId));
+
 // grava a mudança, com uma linha no histórico
 async function gravarAndamento(id, mudancas, nota) {
   const g = ganhas.find(x => x.id === id);
