@@ -1192,7 +1192,7 @@
       <button class="modal-close" data-close>✕</button>
     </div>
     <div class="modal-body">
-      <p class="muted small" style="margin-bottom:14px;">Uma licitação está "na região" quando o município fica dentro do raio de pelo menos uma cidade-base. A distância é em <b>linha reta</b> entre os municípios (a rodoviária costuma ser 20–30% maior). Nos órgãos estaduais (DER-MG, SEINFRA) e consórcios, o local da obra é lido nos municípios citados no objeto; se o objeto não cita nenhum, a licitação aparece sempre, marcada como "local a conferir".</p>
+      <p class="muted small" style="margin-bottom:14px;">Uma licitação está "na região" quando o município fica dentro do raio de pelo menos uma cidade-base. A distância é a <b>rodoviária</b>, pela rota mais rápida entre as sedes dos municípios (OpenStreetMap); se a rota não puder ser consultada, aparece a linha reta, marcada como tal. Nos órgãos estaduais (DER-MG, SEINFRA) e consórcios, o local da obra é lido nos municípios citados no objeto; se o objeto não cita nenhum, a licitação aparece sempre, marcada como "local a conferir".</p>
       <div id="reg-linhas"></div>
       <button class="btn btn-ghost btn-sm" id="reg-add" type="button" style="width:100%;justify-content:center;border-style:dashed;color:var(--accent);">+ Adicionar cidade-base</button>
     </div>
@@ -1921,6 +1921,35 @@ function distanciaKm(a, b) {
   return 2 * R * Math.asin(Math.sqrt(h));
 }
 
+// distância rodoviária (rota mais rápida do OSRM/OpenStreetMap) de cada cidade-base a todos os municípios,
+// guardada no navegador; enquanto não chega, vale a linha reta marcada como tal
+const rotasKm = {};   // ibge da base -> { ibge do município: km }
+const ROTAS_VERSAO = "rotas-v1:";
+async function rotasDaBase(baseIbge) {
+  try { const s = localStorage.getItem(ROTAS_VERSAO + baseIbge); if (s) return JSON.parse(s); } catch {}
+  const base = municipios[baseIbge];
+  const coord = m => `${m[2]},${m[1]}`;
+  const ibges = Object.keys(municipios), tabela = {};
+  for (let i = 0; i < ibges.length; i += 100) {
+    const lote = ibges.slice(i, i + 100);
+    const url = `https://router.project-osrm.org/table/v1/driving/${[base, ...lote.map(k => municipios[k])].map(coord).join(";")}?sources=0&annotations=distance`;
+    const r = await fetch(url).then(r => r.json());
+    if (r.code !== "Ok") throw new Error(r.message || r.code);
+    lote.forEach((k, j) => { const d = r.distances[0][j + 1]; if (d != null) tabela[k] = Math.round(d / 1000); });
+  }
+  try { localStorage.setItem(ROTAS_VERSAO + baseIbge, JSON.stringify(tabela)); } catch {}
+  return tabela;
+}
+async function carregarRotas() {
+  let mudou = false;
+  for (const r of regioes) {
+    if (rotasKm[r.ibge] || !municipios[r.ibge]) continue;
+    try { rotasKm[r.ibge] = await rotasDaBase(r.ibge); mudou = true; }
+    catch (e) { console.error(`Falha ao buscar distâncias rodoviárias de ${r.cidade}:`, e); }
+  }
+  if (mudou) renderAll();
+}
+
 // órgãos estaduais (DER-MG, SEINFRA) e consórcios: o PNCP traz a cidade-sede do órgão, não a da obra
 function ehSedeDoOrgao(l) {
   const esfera = fonte(l).esfera;
@@ -1972,12 +2001,14 @@ function regiaoDe(l) {
     for (const r of regioes) {
       const base = municipios[r.ibge];
       if (!base) continue;
-      const d = distanciaKm(m, base);
+      const rota = rotasKm[r.ibge]?.[ibge];
+      const reta = rota == null;
+      const d = reta ? distanciaKm(m, base) : rota;
       const folga = d - r.raio;
-      if (!melhor || folga < melhor.folga) melhor = { d, folga, base: r.cidade };
+      if (!melhor || folga < melhor.folga) melhor = { d, folga, base: r.cidade, reta };
     }
   }
-  const info = melhor ? { km: Math.round(melhor.d), base: melhor.base, dentro: melhor.folga <= 0 } : null;
+  const info = melhor ? { km: Math.round(melhor.d), base: melhor.base, dentro: melhor.folga <= 0, reta: melhor.reta } : null;
   regiaoCache.set(l.id, info);
   return info;
 }
@@ -2001,11 +2032,11 @@ function renderRegiaoBar() {
 function regiaoHtml(l) {
   const r = regiaoDe(l);
   if (!r) return automatica(l) || l.cidade ? `<div class="dist indef" title="Município da obra não identificado — conferir no objeto">local a conferir</div>` : "";
-  return `<div class="dist ${r.dentro ? "dentro" : "fora"}" title="Distância em linha reta">${r.km} km de ${escapeHtml(r.base)}</div>`;
+  return `<div class="dist ${r.dentro ? "dentro" : "fora"}" title="${r.reta ? "Distância em linha reta (rota rodoviária indisponível)" : "Distância rodoviária (OpenStreetMap)"}">${r.km} km de ${escapeHtml(r.base)}${r.reta ? " (linha reta)" : ""}</div>`;
 }
 function textoRegiao(l) {
   const r = regiaoDe(l);
-  return r ? `${r.km} km de ${r.base}${r.dentro ? "" : " (fora)"}` : "local a conferir";
+  return r ? `${r.km} km de ${r.base}${r.reta ? " (linha reta)" : ""}${r.dentro ? "" : " (fora)"}` : "local a conferir";
 }
 
 function regLinhaHtml(r = {}) {
@@ -2038,6 +2069,7 @@ async function salvarRegioes() {
     regiaoCache.clear();
     document.getElementById("modal-regioes").classList.remove("open");
     renderAll();
+    carregarRotas();
     toast("Regiões de interesse salvas.");
   } catch (e) { toast(e.message || "Erro ao salvar regiões.", true); }
 }
@@ -2076,6 +2108,7 @@ async function init() {
     certidoes = Array.isArray(metaCert?.lista) ? metaCert.lista : [];
     atestados = Array.isArray(metaAt?.lista) ? metaAt.lista : [];
     if (metaRegioes && Array.isArray(metaRegioes.lista) && metaRegioes.lista.length) regioes = metaRegioes.lista;
+    carregarRotas();
     setConnStatus(true);
   } catch (e) {
     console.error(e);
@@ -3322,7 +3355,7 @@ function exportarExcel() {
     "DATA": fmtDateTime(l.dataSessao),
     "ÓRGÃO": l.orgao || "",
     "CIDADE": cidadeExibicao(l),
-    "DISTÂNCIA DA BASE (linha reta)": textoRegiao(l),
+    "DISTÂNCIA DA BASE (rodoviária)": textoRegiao(l),
     "Nº LICITAÇÃO": l.numero || "",
     "MODALIDADE": l.modalidade || "",
     "SERVIÇOS": (l.servicos || []).map(s => `${s.nome}${s.pct != null ? " " + s.pct + "%" : ""}`).join("\n") || servicosDetectados(l).join(", "),
