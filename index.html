@@ -574,7 +574,18 @@
     .clamp{-webkit-line-clamp:unset;}
     .panel{border:none;}
     tbody tr{break-inside:avoid;}
+    /* relatório impresso das licitações: só Data, Órgão, Cidade, Nº, Serviços %, Valor e resumo do objeto */
+    #view-controle{page:relatorio;}
+    #lic-wrap th:nth-child(1), #lic-wrap td:nth-child(1),
+    #lic-wrap th:nth-child(n+9), #lic-wrap td:nth-child(n+9){display:none !important;}
+    #lic-wrap .badges, #lic-wrap .badge, #lic-wrap .dist, #lic-wrap .more, #lic-wrap .col-serv > .small{display:none !important;}
+    #lic-wrap .col-objeto .clamp{display:-webkit-box;-webkit-box-orient:vertical;-webkit-line-clamp:3;overflow:hidden;}
+    #lic-wrap th, #lic-wrap td{font-size:9.5pt;padding:5px 7px;vertical-align:top;}
+    #lic-wrap table{width:100% !important;}
+    #lic-wrap .col-objeto{min-width:0;max-width:none;width:32%;}
+    #lic-wrap td:nth-child(4){min-width:90px;}
   }
+  @page relatorio{size:A4 landscape;margin:8mm;}
 </style>
 <style id="tema-escuro" media="not all">
 /* Tema escuro (o mesmo do Portal LM): fica desligado (media="not all") e o botão ☾/☀ do topo liga.
