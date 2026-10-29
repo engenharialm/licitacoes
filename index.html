@@ -177,6 +177,9 @@
   .bar-row .bar-val{text-align:right;font-weight:600;}
 
   .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;padding:14px 18px;border-bottom:1px solid var(--border);}
+  .f-periodo{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--text-dim);}
+  .f-periodo input{border:1px solid var(--border);border-radius:8px;padding:6px 8px;font-family:inherit;font-size:.78rem;background:var(--card);color:inherit;}
+  .print-only{display:none;}
   .toolbar input[type=text], .toolbar select{
     background:var(--bg-elev);border:1px solid var(--border);color:var(--text);
     padding:9px 12px;border-radius:8px;font-family:inherit;font-size:.8rem;
@@ -519,6 +522,8 @@
     .toolbar select{min-width:0;width:100%;}
     .toolbar .spacer{display:none;}
     .toolbar-count{grid-column:1 / -1;}
+    .f-periodo{grid-column:1 / -1;display:flex;}
+    .f-periodo input{flex:1;min-width:0;}
 
     /* tabelas viram cartões, com o nome da coluna em cima de cada valor */
     .table-wrap{max-height:none !important;overflow:visible;}
@@ -563,7 +568,7 @@
   }
 
   @media print{
-    @page{size:A3 landscape;margin:8mm;}
+    @page{size:A4 landscape;margin:8mm;}
     body{background:#fff;}
     header .header-actions, .tabs, .toolbar, .no-print, .update-line{display:none !important;}
     header{position:static;}
@@ -575,7 +580,10 @@
     .panel{border:none;}
     tbody tr{break-inside:avoid;}
     /* relatório impresso das licitações: só Data, Órgão, Cidade, Nº, Serviços %, Valor e resumo do objeto */
-    #view-controle{page:relatorio;}
+    #lic-wrap thead{display:table-header-group !important;}
+    #lic-wrap tr{break-inside:avoid;}
+    .print-only{display:block !important;}
+    #lic-periodo{font-size:10pt;font-weight:600;margin:0 0 6px 7px;}
     #lic-wrap th:nth-child(1), #lic-wrap td:nth-child(1),
     #lic-wrap th:nth-child(n+9), #lic-wrap td:nth-child(n+9){display:none !important;}
     #lic-wrap .badges, #lic-wrap .badge, #lic-wrap .dist, #lic-wrap .more, #lic-wrap .col-serv > .small{display:none !important;}
@@ -584,8 +592,10 @@
     #lic-wrap table{width:100% !important;}
     #lic-wrap .col-objeto{min-width:0;max-width:none;width:32%;}
     #lic-wrap td:nth-child(4){min-width:90px;}
+    #lic-wrap .serv-item{margin:0 0 1px !important;padding:0 !important;}
+    #lic-wrap .serv-line{font-size:8pt !important;line-height:1.25;gap:8px;}
+    #lic-wrap .serv-bar{display:none !important;}
   }
-  @page relatorio{size:A4 landscape;margin:8mm;}
 </style>
 <style id="tema-escuro" media="not all">
 /* Tema escuro (o mesmo do Portal LM): fica desligado (media="not all") e o botão ☾/☀ do topo liga.
@@ -1020,6 +1030,11 @@
             <option value="15">Sessão em até 15 dias</option>
             <option value="30">Sessão em até 30 dias</option>
           </select>
+          <span class="f-periodo" title="Sessões neste período (vale para a tela e para o Imprimir / PDF)">
+            <label for="f-de">De</label><input type="date" id="f-de">
+            <label for="f-ate">até</label><input type="date" id="f-ate">
+            <button class="icon-btn" id="f-periodo-limpar" type="button" title="Limpar o período" hidden>✕</button>
+          </span>
           <div class="spacer"></div>
           <button class="btn btn-ghost btn-sm" id="btn-lixeira" type="button" title="Licitações marcadas NÃO: ficam guardadas aqui, fora da lista">🗑 Lixeira <span id="lixeira-n"></span></button>
           <span class="toolbar-count" id="lic-count"></span>
@@ -1028,6 +1043,7 @@
             <button class="icon-btn" id="rolar-dir" type="button" aria-label="Rolar a tabela para a direita">▶</button>
           </div>
         </div>
+        <div class="print-only" id="lic-periodo"></div>
         <div class="table-wrap" id="lic-wrap">
           <table class="tabela-cards">
             <thead>
@@ -2279,6 +2295,7 @@ function getFiltered() {
   const fServ = document.getElementById("f-servico").value;
   const fMod = document.getElementById("f-modalidade").value;
   const fPrazo = Number(document.getElementById("f-prazo").value) || 0;
+  const fDe = document.getElementById("f-de").value, fAte = document.getElementById("f-ate").value;
 
   const list = licitacoes.filter(l => {
     if (!visivel(l)) return false;
@@ -2297,6 +2314,7 @@ function getFiltered() {
     if (fMod && l.modalidade !== fMod) return false;
     if (!passaRegiao(l)) return false;
     if (fPrazo) { const d = diasAte(l.dataSessao); if (d === null || d < 0 || d > fPrazo) return false; }
+    if (fDe || fAte) { const d = (l.dataSessao || "").slice(0, 10); if (!d || (fDe && d < fDe) || (fAte && d > fAte)) return false; }
     if (busca) {
       const hay = norm([l.orgao, l.cidade, l.objeto, l.numero, l.observacao, l.atestados, l.status].join(" "));
       if (!hay.includes(busca)) return false;
@@ -2723,6 +2741,10 @@ function renderTabela() {
   document.getElementById("lixeira-n").textContent = naLixeira ? `(${naLixeira})` : "";
   document.getElementById("btn-lixeira").classList.toggle("on", document.getElementById("f-interesse").value === "nao");
   document.getElementById("tab-count-controle").textContent = licitacoes.filter(l => visivel(l) && (isPendente(l) || isSim(l))).length;
+  const fDe = document.getElementById("f-de").value, fAte = document.getElementById("f-ate").value;
+  document.getElementById("f-periodo-limpar").hidden = !fDe && !fAte;
+  const dataBr = d => d.split("-").reverse().join("/");
+  document.getElementById("lic-periodo").textContent = `Licitações${fDe && fAte ? ` de ${dataBr(fDe)} a ${dataBr(fAte)}` : fDe ? ` a partir de ${dataBr(fDe)}` : fAte ? ` até ${dataBr(fAte)}` : ""} · ${list.length} licitaç${list.length === 1 ? "ão" : "ões"} · impresso em ${new Date().toLocaleDateString("pt-BR")}`;
   const tbody = document.getElementById("lic-table");
   if (!list.length) {
     tbody.innerHTML = `<tr><td colspan="13"><div class="empty-state">${licitacoes.length
@@ -4849,7 +4871,10 @@ document.addEventListener("click", e => {
   if (more) { const c = more.previousElementSibling; c.classList.toggle("open"); more.textContent = c.classList.contains("open") ? "ver menos" : "ver tudo"; return; }
   if (e.target.closest("[data-close]")) e.target.closest(".modal-backdrop").classList.remove("open");
 });
-["f-busca", "f-interesse", "f-servico", "f-modalidade", "f-prazo"].forEach(id => {
+document.getElementById("f-periodo-limpar").addEventListener("click", () => {
+  document.getElementById("f-de").value = ""; document.getElementById("f-ate").value = ""; renderTabela();
+});
+["f-busca", "f-interesse", "f-servico", "f-modalidade", "f-prazo", "f-de", "f-ate"].forEach(id => {
   document.getElementById(id).addEventListener(id === "f-busca" ? "input" : "change", renderTabela);
 });
 document.querySelectorAll("th.sortable").forEach(th => th.addEventListener("click", () => {
