@@ -1940,6 +1940,14 @@ async function rotasDaBase(baseIbge) {
   try { localStorage.setItem(ROTAS_VERSAO + baseIbge, JSON.stringify(tabela)); } catch {}
   return tabela;
 }
+// rotas já calculadas das cidades-base atuais (arquivo rotas-mg.json, gerado com o mesmo OSRM):
+// abre na hora, sem esperar o servidor de rotas; só uma cidade-base nova é consultada online
+async function carregarRotasArquivo() {
+  try {
+    const arq = await fetch("rotas-mg.json").then(r => r.ok ? r.json() : null);
+    for (const [base, tabela] of Object.entries(arq?.rotas || {})) rotasKm[base] = tabela;
+  } catch (e) { console.error("Falha ao ler rotas-mg.json:", e); }
+}
 async function carregarRotas() {
   let mudou = false;
   for (const r of regioes) {
@@ -2104,7 +2112,7 @@ async function init() {
   try {
     let metaRegioes;
     let metaCert, metaAt;
-    [licitacoes, meta, metaAlerta, metaRegioes, ganhas, metaCert, metaAt] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta"), store.getMeta("regioes"), storeGanhas.loadAll(), store.getMeta("certidoes"), store.getMeta("atestados"), carregarMunicipios()]);
+    [licitacoes, meta, metaAlerta, metaRegioes, ganhas, metaCert, metaAt] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta"), store.getMeta("regioes"), storeGanhas.loadAll(), store.getMeta("certidoes"), store.getMeta("atestados"), carregarMunicipios(), carregarRotasArquivo()]);
     certidoes = Array.isArray(metaCert?.lista) ? metaCert.lista : [];
     atestados = Array.isArray(metaAt?.lista) ? metaAt.lista : [];
     if (metaRegioes && Array.isArray(metaRegioes.lista) && metaRegioes.lista.length) regioes = metaRegioes.lista;
