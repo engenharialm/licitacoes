@@ -1599,13 +1599,39 @@ const firebaseConfig = {
 
 const SITE_PASSWORD = "LM12";
 const ACTION_UNLOCK_KEY = "licUnlocked";
+// a senha é pedida numa janela do próprio site (o prompt() do navegador pode ser bloqueado);
+// depois de liberado, o botão que pediu a senha é clicado de novo
+let ultimoClique = null;
+document.addEventListener("click", e => { if (!e.target.closest?.("#senha-box")) ultimoClique = e.target.closest?.("button, a, [role=button]") || e.target; }, true);
 function requireUnlock() {
   if (sessionStorage.getItem(ACTION_UNLOCK_KEY) === "true") return true;
-  const attempt = prompt("Digite a senha para fazer essa alteração:");
-  if (attempt === null) return false;
-  if (attempt === SITE_PASSWORD) { sessionStorage.setItem(ACTION_UNLOCK_KEY, "true"); return true; }
-  toast("Senha incorreta.", true);
+  pedirSenha(ultimoClique);
   return false;
+}
+function pedirSenha(alvo) {
+  document.getElementById("senha-box")?.remove();
+  const box = document.createElement("div");
+  box.id = "senha-box";
+  box.style.cssText = "position:fixed;inset:0;z-index:9999;background:rgba(15,23,42,.45);display:flex;align-items:center;justify-content:center;";
+  box.innerHTML = `<form style="background:var(--card);color:var(--text);border-radius:10px;padding:20px;width:min(340px,92vw);box-shadow:0 10px 30px rgba(0,0,0,.25);">
+    <div style="font-weight:600;margin-bottom:10px;">Digite a senha para fazer essa alteração</div>
+    <input type="password" autocomplete="current-password" style="width:100%;padding:9px;border:1px solid var(--border);border-radius:8px;font:inherit;">
+    <div class="muted small" data-erro style="color:var(--danger);min-height:18px;margin-top:6px;"></div>
+    <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:6px;">
+      <button type="button" class="btn btn-ghost btn-sm" data-cancelar>Cancelar</button>
+      <button type="submit" class="btn btn-accent btn-sm">Liberar</button>
+    </div></form>`;
+  document.body.appendChild(box);
+  const input = box.querySelector("input");
+  input.focus();
+  box.querySelector("[data-cancelar]").onclick = () => box.remove();
+  box.querySelector("form").onsubmit = e => {
+    e.preventDefault();
+    if (input.value !== SITE_PASSWORD) { box.querySelector("[data-erro]").textContent = "Senha incorreta."; input.select(); return; }
+    sessionStorage.setItem(ACTION_UNLOCK_KEY, "true");
+    box.remove();
+    if (alvo && alvo.isConnected) alvo.click();
+  };
 }
 
 const COL_NAME = "licitacoes";
