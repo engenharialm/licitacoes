@@ -1872,6 +1872,7 @@ function servicosDetectados(l) {
 function isAtiva(l) {
   if (!automatica(l)) return !STATUS_FINAIS.includes(l.status);
   if (l.origem === "PNCP" && l.naListaPncp === false) return false;
+  if (l.suspensa) return true;   // suspensa continua no controle até ser retomada, revogada ou anulada
   if (l.origem === "ALERTA" && l.naListaAlerta === false) return false;
   return !l.dataSessao || l.dataSessao >= localIso(new Date());
 }
@@ -2185,6 +2186,11 @@ function interesseBotoes(l) {
 }
 
 function prazoBadge(l) {
+  if (l.suspensa) return `<span class="badge danger" title="Situação no PNCP: ${escapeHtml(l.pncp?.situacao || "Suspensa")}">SUSPENSA</span>`;
+  const remarcada = l.remarcacao ? `<span class="badge warn" title="Remarcada em ${fmtDateTime(l.remarcacao.em).slice(0, 10)}">REMARCADA · antes ${fmtDateTime(l.remarcacao.de).slice(0, 10)}</span>` : "";
+  return remarcada + prazoContagem(l);
+}
+function prazoContagem(l) {
   const d = diasAte(l.dataSessao);
   if (d === null) return "";
   if (d < 0) return `<span class="badge grey">encerrada</span>`;
@@ -3059,6 +3065,25 @@ function camposDoPncp(p) {
     modalidade: p.modalidade, objeto: p.objeto, valor: p.valor, linkPortal: p.linkOrigem
   };
 }
+// sessão mudou de data: guarda a data anterior para mostrar "REMARCADA"
+function mudancaDeSessao(atual, novaData, lote) {
+  if (!atual.dataSessao || !novaData || novaData.slice(0, 16) === atual.dataSessao.slice(0, 16)) return {};
+  return { remarcacao: { de: atual.dataSessao, para: novaData, em: lote } };
+}
+// dados atuais de uma licitação já cadastrada (situação e datas), pelo link do PNCP
+async function buscarCompra(l) {
+  const m = (l.pncp?.linkPncp || "").match(/editais\/(\d+)\/(\d+)\/(\d+)/);
+  if (!m) return null;
+  for (let t = 1; t <= 3; t++) {
+    await sleep(1200);
+    try {
+      const r = await fetch(`https://pncp.gov.br/api/consulta/v1/orgaos/${m[1]}/compras/${m[2]}/${m[3]}`);
+      if (r.ok) return await r.json();
+      if (r.status === 404) return null;
+    } catch {}
+  }
+  return null;
+}
 function docId(it) { return "pncp_" + String(it.numeroControlePNCP).replace(/[^\w-]/g, "_"); }
 
 async function buscarPagina(mod, pag, dataFinal, log) {
@@ -3162,12 +3187,29 @@ async function atualizarPncp() {
         const upd = { pncp, naListaPncp: true, atualizadoEm: lote };
         const top = camposDoPncp(pncp);
         for (const k of Object.keys(top)) if (!(atual.camposEditados || []).includes(k)) upd[k] = top[k];
+        Object.assign(upd, mudancaDeSessao(atual, upd.dataSessao ?? atual.dataSessao, lote), { suspensa: false });
         entries.push({ id, data: upd });
       }
     }
-    // o que saiu da lista do PNCP (prazo encerrado, suspensa, revogada) fica guardado, mas marcado
-    for (const l of licitacoes) {
-      if (l.origem === "PNCP" && l.naListaPncp !== false && !vistos.has(l.id)) entries.push({ id: l.id, data: { naListaPncp: false, atualizadoEm: lote } });
+    // o que saiu da lista de propostas abertas: consulta a licitação no PNCP para saber se foi
+    // suspensa, remarcada, revogada ou anulada (as encerradas há tempo não precisam ser consultadas)
+    const fora = licitacoes.filter(l => l.origem === "PNCP" && !vistos.has(l.id) && (l.naListaPncp !== false || l.suspensa) &&
+      (l.suspensa || !l.dataSessao || l.dataSessao >= localIso(new Date(Date.now() - 2 * 86400000))));
+    let alteradas = 0;
+    for (let i = 0; i < fora.length; i++) {
+      const l = fora[i];
+      etapa.textContent = `Conferindo situação no PNCP: ${i + 1} de ${fora.length}`;
+      const det = await buscarCompra(l);
+      if (!det) { entries.push({ id: l.id, data: { naListaPncp: false, atualizadoEm: lote } }); continue; }
+      const sit = Number(det.situacaoCompraId), editados = l.camposEditados || [];
+      const novaData = det.dataEncerramentoProposta || l.dataSessao;
+      const upd = { atualizadoEm: lote, suspensa: sit === 4,
+        pncp: { ...l.pncp, situacao: det.situacaoCompraNome || "", dataAbertura: det.dataAberturaProposta || "", dataEncerramento: det.dataEncerramentoProposta || "" },
+        // revogada/anulada sai; suspensa fica; divulgada com sessão futura (ex.: propostas ainda não abertas) fica
+        naListaPncp: sit === 4 || (sit === 1 && novaData >= agora) };
+      if (!editados.includes("dataSessao")) { upd.dataSessao = novaData; Object.assign(upd, mudancaDeSessao(l, novaData, lote)); }
+      if (upd.suspensa !== !!l.suspensa || upd.remarcacao) { alteradas++; log(`${upd.suspensa ? "SUSPENSA" : upd.remarcacao ? "REMARCADA" : det.situacaoCompraNome}: ${l.orgao} — ${l.numero}`); }
+      entries.push({ id: l.id, data: upd });
     }
     log(`\nGravando ${entries.length} registros...`);
     await store.saveMany(entries);
@@ -3176,7 +3218,7 @@ async function atualizarPncp() {
     licitacoes = await store.loadAll();
     renderAll();
     etapa.textContent = "Concluído.";
-    resumo.textContent = `${grupos.size} relevantes · ${novos} novas` + (falhas.length ? ` · ${falhas.length} páginas não lidas` : "");
+    resumo.textContent = `${grupos.size} relevantes · ${novos} novas` + (alteradas ? ` · ${alteradas} suspensas/remarcadas` : "") + (falhas.length ? ` · ${falhas.length} páginas não lidas` : "");
     log(`\nPronto: ${coletados.size} licitações abertas em MG, ${grupos.size} de pavimentação/terraplenagem/drenagem, ${novos} novas.`);
     if (falhas.length) log(`Atenção: páginas não lidas (PNCP bloqueou): ${falhas.join("; ")}. Atualize de novo mais tarde para completar.`);
   } catch (e) {
