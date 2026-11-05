@@ -2214,7 +2214,9 @@ function interesseBotoes(l) {
 function prazoBadge(l) {
   if (l.suspensa) return `<span class="badge danger" title="Situação no PNCP: ${escapeHtml(l.pncp?.situacao || "Suspensa")}">SUSPENSA</span>`;
   const remarcada = l.remarcacao ? `<span class="badge warn" title="Remarcada em ${fmtDateTime(l.remarcacao.em).slice(0, 10)}">REMARCADA · antes ${fmtDateTime(l.remarcacao.de).slice(0, 10)}</span>` : "";
-  return remarcada + prazoContagem(l);
+  const conferir = l.disputaEdital?.conferir && !(l.camposEditados || []).includes("dataSessao")
+    ? `<span class="badge grey" title="O horário da disputa não foi achado no edital: a data mostrada é o fim do envio de propostas no PNCP">horário a conferir</span>` : "";
+  return remarcada + prazoContagem(l) + conferir;
 }
 function prazoContagem(l) {
   const d = diasAte(l.dataSessao);
@@ -3091,6 +3093,12 @@ function camposDoPncp(p) {
     modalidade: p.modalidade, objeto: p.objeto, valor: p.valor, linkPortal: p.linkOrigem
   };
 }
+// o PNCP só traz o fim das propostas; o horário da disputa é lido do edital pelo robô do GitHub
+// (scripts/horario_disputa.py) e vale enquanto o PNCP não mudar a data
+function horaDaDisputa(l, encerramento) {
+  const d = l.disputaEdital;
+  return d?.sessao && encerramento && d.encerramento === encerramento ? d.sessao : encerramento;
+}
 // sessão mudou de data: guarda a data anterior para mostrar "REMARCADA"
 function mudancaDeSessao(atual, novaData, lote) {
   if (!atual.dataSessao || !novaData || novaData.slice(0, 16) === atual.dataSessao.slice(0, 16)) return {};
@@ -3213,6 +3221,7 @@ async function atualizarPncp() {
         const upd = { pncp, naListaPncp: true, atualizadoEm: lote };
         const top = camposDoPncp(pncp);
         for (const k of Object.keys(top)) if (!(atual.camposEditados || []).includes(k)) upd[k] = top[k];
+        if ("dataSessao" in upd) upd.dataSessao = horaDaDisputa(atual, upd.dataSessao);
         Object.assign(upd, mudancaDeSessao(atual, upd.dataSessao ?? atual.dataSessao, lote), { suspensa: false });
         entries.push({ id, data: upd });
       }
@@ -3233,7 +3242,7 @@ async function atualizarPncp() {
         pncp: { ...l.pncp, situacao: det.situacaoCompraNome || "", dataAbertura: det.dataAberturaProposta || "", dataEncerramento: det.dataEncerramentoProposta || "" },
         // revogada/anulada sai; suspensa fica; divulgada com sessão futura (ex.: propostas ainda não abertas) fica
         naListaPncp: sit === 4 || (sit === 1 && novaData >= agora) };
-      if (!editados.includes("dataSessao")) { upd.dataSessao = novaData; Object.assign(upd, mudancaDeSessao(l, novaData, lote)); }
+      if (!editados.includes("dataSessao")) { upd.dataSessao = horaDaDisputa(l, det.dataEncerramentoProposta || "") || novaData; Object.assign(upd, mudancaDeSessao(l, novaData, lote)); }
       if (upd.suspensa !== !!l.suspensa || upd.remarcacao) { alteradas++; log(`${upd.suspensa ? "SUSPENSA" : upd.remarcacao ? "REMARCADA" : det.situacaoCompraNome}: ${l.orgao} — ${l.numero}`); }
       entries.push({ id: l.id, data: upd });
     }

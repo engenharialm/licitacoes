@@ -1,0 +1,20 @@
+# Lê o horário da disputa nos editais do PNCP e grava no controle (scripts/horario_disputa.py).
+# Roda sozinho 3 vezes por dia; também dá para rodar na hora em Actions → "Horário da disputa" → Run workflow.
+name: Horário da disputa
+
+on:
+  schedule:
+    - cron: "0 10,15,21 * * *"   # 07h, 12h e 18h em Brasília
+  workflow_dispatch:
+
+jobs:
+  ler-editais:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pypdf==5.1.0
+      - run: python scripts/horario_disputa.py
