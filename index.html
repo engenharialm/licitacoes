@@ -1821,7 +1821,7 @@ const RX = {
   // "obras de infraestrutura do loteamento/assentamento" (o edital é que diz se tem asfalto)
   pavimento: /\bpavimentos?\b/,
   via: /\b(estradas?|vias?|ruas?|rodovias?|avenidas?|vicinais?|logradouros?|trechos?)\b/,
-  viario: /infraestrutura viaria|infraestrutura urbana|obras? viarias?|sistema viario|alargamento d[aeo]s? (rua|avenida|via)|infraestrutura.{0,80}(assentamento|loteamento|regularizacao fundiaria|conjunto habitacional)/,
+  viario: /infraestrutura viaria|infraestrutura urbana|infraestrutura rural|melhorias? (de|da|na) infraestrutura|(reestrutura|readequa)\w* d[eao]s? pavimen|obras? viarias?|sistema viario|(reestrutura|requalifica|revitaliza)\w* (n|d)[aeo]s? (avenida|rua|via|estrada)|alargamento d[aeo]s? (rua|avenida|via)|infraestrutura.{0,80}(assentamento|loteamento|regularizacao fundiaria|conjunto habitacional)/,
   // "pavimento" também é andar de prédio
   predio: /escola|creche|predios?\b|edificac|edificio|\bubs\b|unidade basica|hospital|ginasio|credenciamento|madeira/
 };
