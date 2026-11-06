@@ -349,6 +349,7 @@
   .tab .count.alerta{background:#DC2626;color:#fff;}
   .badge.vencida{background:#FEE2E2;color:#B91C1C;}
   .cal-item.cert{border-left-color:#DC2626;}
+  .cal-item.suspensa{border-left-color:#F97316;background:#FEF3C7;}
   /* em andamento (quadro por fase) */
   .kanban{display:flex;gap:12px;overflow-x:auto;padding:14px;align-items:flex-start;}
   .kb-col{flex:0 0 250px;background:var(--bg);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;max-height:calc(100vh - 260px);}
@@ -744,6 +745,7 @@
   .card .value.nova{color:#7DB2FF}
   .decide-item.nova{background:#10335A;box-shadow:inset 4px 0 0 #3DF2FF}
   .decide-item.suspensa{background:#3D3110;box-shadow:inset 4px 0 0 #F59E0B}
+  .cal-item.suspensa{background:#3D3110}
   .av-bt{background:rgba(255,255,255,.04)}
   .toast-acao{color:var(--lm-cyan);border-color:var(--lm-cyan)}
   .int-btn.sim.on{background:#0B6E99;border-color:#0B6E99;color:#fff}
@@ -859,7 +861,7 @@
             <button class="icon-btn" data-cal="0" title="Voltar para hoje" type="button">Hoje</button>
           </div>
           <div class="cal-grade" id="cal-grade"></div>
-          <div class="cal-leg"><span><i style="background:var(--warning)"></i>a decidir</span><span><i style="background:var(--accent)"></i>vamos participar</span><span><i style="background:#DC2626"></i>certidão vence</span></div>
+          <div class="cal-leg"><span><i style="background:var(--warning)"></i>a decidir</span><span><i style="background:var(--accent)"></i>vamos participar</span><span><i style="background:#F97316"></i>suspensa</span><span><i style="background:#DC2626"></i>certidão vence</span></div>
           <div class="cal-lista-titulo" id="cal-lista-titulo"></div>
           <div class="cal-lista" id="cal-lista"></div>
         </aside>
@@ -2333,7 +2335,7 @@ function renderCalendario() {
     const d = new Date(inicio); d.setDate(inicio.getDate() + i);
     if (i === 35 && d.getMonth() !== calMes.getMonth()) break;   // não sobra uma semana vazia
     const k = chaveDia(d), evs = porDia.get(k) || [];
-    const pts = evs.slice(0, 4).map(ev => `<i style="background:${ev.c ? "#DC2626" : isSim(ev.l) ? "var(--accent)" : "var(--warning)"}"></i>`).join("");
+    const pts = evs.slice(0, 4).map(ev => `<i style="background:${ev.c ? "#DC2626" : estaSuspensa(ev.l) ? "#F97316" : isSim(ev.l) ? "var(--accent)" : "var(--warning)"}"></i>`).join("");
     const cls = [d.getMonth() !== calMes.getMonth() ? "fora" : "", evs.length ? "tem" : "", k === hoje ? "hoje" : "", k === calDia ? "sel" : ""].join(" ");
     const nLic = evs.filter(ev => ev.l).length, nCert = evs.length - nLic;
     const dica = [nLic ? `${nLic} licitação(ões)` : "", nCert ? `${nCert} certidão(ões) vencendo` : ""].filter(Boolean).join(" · ");
@@ -2352,7 +2354,7 @@ function renderCalendario() {
       <div class="l1"><b>Certidão: ${escapeHtml(c.nome)}</b><span class="nowrap">${calDia ? "" : quando.slice(8, 10) + "/" + quando.slice(5, 7)}</span></div>
       <div class="obj">${escapeHtml(situacaoCert(c).txt)} — renovar antes das próximas sessões</div>
     </div>` : `
-    <div class="cal-item ${isSim(l) ? "sim" : ""}" data-edit="${escapeHtml(l.id)}">
+    <div class="cal-item ${estaSuspensa(l) ? "suspensa" : isSim(l) ? "sim" : ""}" data-edit="${escapeHtml(l.id)}">
       <div class="l1"><b>${escapeHtml(cidadeExibicao(l) || l.cidade || "Local a conferir")}</b><span class="nowrap">${l.valor > 0 ? fmtMoneyCurto(l.valor) : ""}</span></div>
       <div class="obj clamp" style="-webkit-line-clamp:2;">${calDia ? fmtDateTime(l.dataSessao).slice(11) : fmtDateTime(l.dataSessao).slice(0, 5)} · ${escapeHtml(l.objeto)}</div>
     </div>`).join("") : `<div class="muted small" style="padding:10px 0;">Nada ${calDia ? "neste dia" : "neste mês"}.</div>`;
