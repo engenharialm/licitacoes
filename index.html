@@ -209,10 +209,12 @@
   .badge.semana{background:#1565C0;color:#fff;}
   .card .value.nova{color:#1565C0;}
   .decide-item.nova{background:#E1F0FF;box-shadow:inset 4px 0 0 #1565C0;}
-  .decide-item.suspensa{background:#FEF3C7;box-shadow:inset 4px 0 0 #F59E0B;}
-  .card .value.suspensa{color:#B45309;}
+  .decide-item.suspensa{background:#FEF9C3;box-shadow:inset 4px 0 0 #EAB308;}
+  .card .value.suspensa{color:#CA8A04;}
+  .card .value.decidir{color:#7C3AED;}
+  .badge.suspensa{background:#FEF08A;color:#854D0E;}
   .susp-chk{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:.66rem;font-weight:600;color:var(--text-dim);cursor:pointer;white-space:nowrap;}
-  .susp-chk input{margin:0;cursor:pointer;accent-color:#F59E0B;}
+  .susp-chk input{margin:0;cursor:pointer;accent-color:#EAB308;}
   tbody tr.row-sim td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
   .table-wrap{overflow:auto;max-height:calc(100vh - 230px);}
   .rolar-lados{display:flex;gap:6px;}
@@ -333,7 +335,7 @@
   .cal-leg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;}
   .cal-lista-titulo{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-dim);margin:12px 0 4px;display:flex;justify-content:space-between;align-items:center;}
   .cal-lista{max-height:360px;overflow:auto;}
-  .cal-item{padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;border-left:3px solid var(--warning);}
+  .cal-item{padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;border-left:3px solid #7C3AED;}
   .cal-item.sim{border-left-color:var(--accent);}
   .cal-item:hover{background:var(--card-hover);}
   .cal-item .l1{display:flex;justify-content:space-between;gap:8px;font-size:.8rem;}
@@ -349,7 +351,7 @@
   .tab .count.alerta{background:#DC2626;color:#fff;}
   .badge.vencida{background:#FEE2E2;color:#B91C1C;}
   .cal-item.cert{border-left-color:#DC2626;}
-  .cal-item.suspensa{border-left-color:#F97316;background:#FEF3C7;}
+  .cal-item.suspensa{border-left-color:#EAB308;background:#FEF9C3;}
   /* em andamento (quadro por fase) */
   .kanban{display:flex;gap:12px;overflow-x:auto;padding:14px;align-items:flex-start;}
   .kb-col{flex:0 0 250px;background:var(--bg);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;max-height:calc(100vh - 260px);}
@@ -744,7 +746,7 @@
   .badge.semana{background:#1E88E5;color:#fff}
   .card .value.nova{color:#7DB2FF}
   .decide-item.nova{background:#10335A;box-shadow:inset 4px 0 0 #3DF2FF}
-  .decide-item.suspensa{background:#3D3110;box-shadow:inset 4px 0 0 #F59E0B}
+  .decide-item.suspensa{background:#3D3110;box-shadow:inset 4px 0 0 #EAB308}
   .cal-item.suspensa{background:#3D3110}
   .av-bt{background:rgba(255,255,255,.04)}
   .toast-acao{color:var(--lm-cyan);border-color:var(--lm-cyan)}
@@ -861,7 +863,7 @@
             <button class="icon-btn" data-cal="0" title="Voltar para hoje" type="button">Hoje</button>
           </div>
           <div class="cal-grade" id="cal-grade"></div>
-          <div class="cal-leg"><span><i style="background:var(--warning)"></i>a decidir</span><span><i style="background:var(--accent)"></i>vamos participar</span><span><i style="background:#F97316"></i>suspensa</span><span><i style="background:#DC2626"></i>certidão vence</span></div>
+          <div class="cal-leg"><span><i style="background:#7C3AED"></i>a decidir</span><span><i style="background:var(--accent)"></i>vamos participar</span><span><i style="background:#EAB308"></i>suspensa</span><span><i style="background:#DC2626"></i>certidão vence</span></div>
           <div class="cal-lista-titulo" id="cal-lista-titulo"></div>
           <div class="cal-lista" id="cal-lista"></div>
         </aside>
@@ -2238,7 +2240,7 @@ function suspensaCaixa(l) {
   return `<label class="susp-chk" data-susp="${escapeHtml(l.id)}" title="${l.suspensa ? "Suspensa no PNCP" : "Marcar como suspensa"}"><input type="checkbox" ${estaSuspensa(l) ? "checked" : ""}> Suspensa</label>`;
 }
 function prazoBadge(l) {
-  if (estaSuspensa(l)) return `<span class="badge warn" title="${l.suspensa ? `Situação no PNCP: ${escapeHtml(l.pncp?.situacao || "Suspensa")}` : "Marcada como suspensa pela equipe"}">SUSPENSA</span>`;
+  if (estaSuspensa(l)) return `<span class="badge suspensa" title="${l.suspensa ? `Situação no PNCP: ${escapeHtml(l.pncp?.situacao || "Suspensa")}` : "Marcada como suspensa pela equipe"}">SUSPENSA</span>`;
   const remarcada = l.remarcacao ? `<span class="badge warn" title="Remarcada em ${fmtDateTime(l.remarcacao.em).slice(0, 10)}">REMARCADA · antes ${fmtDateTime(l.remarcacao.de).slice(0, 10)}</span>` : "";
   const conferir = l.disputaEdital?.conferir && !(l.camposEditados || []).includes("dataSessao")
     ? `<span class="badge grey" title="O horário da disputa não foi achado no edital: a data mostrada é o fim do envio de propostas no PNCP">horário a conferir</span>` : "";
@@ -2266,7 +2268,7 @@ function renderDashboard() {
   const suspensas = base.filter(l => estaSuspensa(l) && (isPendente(l) || isSim(l))).length;
 
   const cards = [
-    { label: "Aguardando decisão", value: pend.length, cls: "warn", sub: "sem SIM ou NÃO", go: "pendentes" },
+    { label: "Aguardando decisão", value: pend.length, cls: "decidir", sub: "sem SIM ou NÃO", go: "pendentes" },
     { label: "Novas da semana", value: novas, cls: novas ? "nova" : "", sub: "entraram desde segunda, sem decisão", go: "novas" },
     { label: "Vamos participar", value: simAndamento.length, cls: "accent", sub: "interesse SIM em andamento", go: "sim" },
     { label: "Sessões em 7 dias", value: semana.length, cls: "", sub: "pendentes + vamos participar", go: "prazo7" },
@@ -2344,7 +2346,7 @@ function renderCalendario() {
     const d = new Date(inicio); d.setDate(inicio.getDate() + i);
     if (i === 35 && d.getMonth() !== calMes.getMonth()) break;   // não sobra uma semana vazia
     const k = chaveDia(d), evs = porDia.get(k) || [];
-    const pts = evs.slice(0, 4).map(ev => `<i style="background:${ev.c ? "#DC2626" : estaSuspensa(ev.l) ? "#F97316" : isSim(ev.l) ? "var(--accent)" : "var(--warning)"}"></i>`).join("");
+    const pts = evs.slice(0, 4).map(ev => `<i style="background:${ev.c ? "#DC2626" : estaSuspensa(ev.l) ? "#EAB308" : isSim(ev.l) ? "var(--accent)" : "#7C3AED"}"></i>`).join("");
     const cls = [d.getMonth() !== calMes.getMonth() ? "fora" : "", evs.length ? "tem" : "", k === hoje ? "hoje" : "", k === calDia ? "sel" : ""].join(" ");
     const nLic = evs.filter(ev => ev.l).length, nCert = evs.length - nLic;
     const dica = [nLic ? `${nLic} licitação(ões)` : "", nCert ? `${nCert} certidão(ões) vencendo` : ""].filter(Boolean).join(" · ");
