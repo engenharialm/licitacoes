@@ -335,8 +335,8 @@
   .cal-leg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;box-shadow:0 0 0 1px rgba(15,23,42,.55);width:11px;height:11px;}
   .cal-lista-titulo{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-dim);margin:12px 0 4px;display:flex;justify-content:space-between;align-items:center;}
   .cal-lista{max-height:360px;overflow:auto;}
-  .cal-item{padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;border-left:6px solid #39FF14;background:#EFFFE8;}
-  .cal-item.sim{border-left-color:var(--accent);}
+  .cal-item{padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;border-left:6px solid #39FF14;background:#F0FFF0;}
+  .cal-item.sim{border-left-color:var(--accent);background:#E3F2F9;}
   .cal-item:hover{background:var(--card-hover);}
   .cal-item .l1{display:flex;justify-content:space-between;gap:8px;font-size:.8rem;}
   .cal-item .l1 b{color:#0F2A3D;}
@@ -350,8 +350,8 @@
   .cert-alerta .ir{margin-left:auto;font-weight:700;white-space:nowrap;}
   .tab .count.alerta{background:#DC2626;color:#fff;}
   .badge.vencida{background:#FEE2E2;color:#B91C1C;}
-  .cal-item.cert{border-left-color:#DC2626;}
-  .cal-item.suspensa{border-left-color:#FFFF00;background:#FFFF99;}
+  .cal-item.cert{border-left-color:#DC2626;background:#FDECEC;}
+  .cal-item.suspensa{border-left-color:#FFFF00;background:#FFFDE0;}
   /* em andamento (quadro por fase) */
   .kanban{display:flex;gap:12px;overflow-x:auto;padding:14px;align-items:flex-start;}
   .kb-col{flex:0 0 250px;background:var(--bg);border:1px solid var(--border);border-radius:10px;display:flex;flex-direction:column;max-height:calc(100vh - 260px);}
@@ -747,6 +747,9 @@
   .card .value.nova{color:#7DB2FF}
   .decide-item.nova{background:#10335A;box-shadow:inset 4px 0 0 #3DF2FF}
   .decide-item.suspensa{background:#3D3110;box-shadow:inset 4px 0 0 #FFFF00}
+  .cal-item{background:#12301A}
+  .cal-item.sim{background:#0F2A3D}
+  .cal-item.cert{background:#3A1717}
   .cal-item.suspensa{background:#3D3110}
   .av-bt{background:rgba(255,255,255,.04)}
   .toast-acao{color:var(--lm-cyan);border-color:var(--lm-cyan)}
