@@ -211,7 +211,7 @@
   .decide-item.nova{background:#E1F0FF;box-shadow:inset 4px 0 0 #1565C0;}
   .decide-item.suspensa{background:#FEF9C3;box-shadow:inset 4px 0 0 #EAB308;}
   .card .value.suspensa{color:#CA8A04;}
-  .card .value.decidir{color:#7C3AED;}
+  .card .value.decidir{color:#16A34A;}
   .badge.suspensa{background:#FEF08A;color:#854D0E;}
   .susp-chk{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:.66rem;font-weight:600;color:var(--text-dim);cursor:pointer;white-space:nowrap;}
   .susp-chk input{margin:0;cursor:pointer;accent-color:#EAB308;}
@@ -335,7 +335,7 @@
   .cal-leg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:4px;}
   .cal-lista-titulo{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--text-dim);margin:12px 0 4px;display:flex;justify-content:space-between;align-items:center;}
   .cal-lista{max-height:360px;overflow:auto;}
-  .cal-item{padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;border-left:3px solid #7C3AED;}
+  .cal-item{padding:8px 6px;border-bottom:1px solid var(--border);cursor:pointer;border-radius:6px;border-left:3px solid #16A34A;}
   .cal-item.sim{border-left-color:var(--accent);}
   .cal-item:hover{background:var(--card-hover);}
   .cal-item .l1{display:flex;justify-content:space-between;gap:8px;font-size:.8rem;}
@@ -373,7 +373,7 @@
   .and-rel{white-space:pre-wrap;font-family:inherit;font-size:.8rem;line-height:1.5;background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:12px;max-height:340px;overflow:auto;margin:0;}
   .and-rec{list-style:none;display:flex;flex-direction:column;gap:6px;margin-bottom:10px;}
   .and-rec li{display:flex;gap:8px;align-items:center;border:1px solid var(--border);border-left:3px solid #DC2626;border-radius:6px;padding:6px 10px;font-size:.78rem;background:var(--bg);}
-  .and-rec li.contra{border-left-color:#7C3AED;}
+  .and-rec li.contra{border-left-color:#16A34A;}
   .and-rec li.decisao{border-left-color:#4D7C0F;}
   .and-rec li .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .and-rec li small{color:var(--text-faint);}
@@ -863,7 +863,7 @@
             <button class="icon-btn" data-cal="0" title="Voltar para hoje" type="button">Hoje</button>
           </div>
           <div class="cal-grade" id="cal-grade"></div>
-          <div class="cal-leg"><span><i style="background:#7C3AED"></i>a decidir</span><span><i style="background:var(--accent)"></i>vamos participar</span><span><i style="background:#EAB308"></i>suspensa</span><span><i style="background:#DC2626"></i>certidão vence</span></div>
+          <div class="cal-leg"><span><i style="background:#16A34A"></i>a decidir</span><span><i style="background:var(--accent)"></i>vamos participar</span><span><i style="background:#EAB308"></i>suspensa</span><span><i style="background:#DC2626"></i>certidão vence</span></div>
           <div class="cal-lista-titulo" id="cal-lista-titulo"></div>
           <div class="cal-lista" id="cal-lista"></div>
         </aside>
@@ -2346,7 +2346,7 @@ function renderCalendario() {
     const d = new Date(inicio); d.setDate(inicio.getDate() + i);
     if (i === 35 && d.getMonth() !== calMes.getMonth()) break;   // não sobra uma semana vazia
     const k = chaveDia(d), evs = porDia.get(k) || [];
-    const pts = evs.slice(0, 4).map(ev => `<i style="background:${ev.c ? "#DC2626" : estaSuspensa(ev.l) ? "#EAB308" : isSim(ev.l) ? "var(--accent)" : "#7C3AED"}"></i>`).join("");
+    const pts = evs.slice(0, 4).map(ev => `<i style="background:${ev.c ? "#DC2626" : estaSuspensa(ev.l) ? "#EAB308" : isSim(ev.l) ? "var(--accent)" : "#16A34A"}"></i>`).join("");
     const cls = [d.getMonth() !== calMes.getMonth() ? "fora" : "", evs.length ? "tem" : "", k === hoje ? "hoje" : "", k === calDia ? "sel" : ""].join(" ");
     const nLic = evs.filter(ev => ev.l).length, nCert = evs.length - nLic;
     const dica = [nLic ? `${nLic} licitação(ões)` : "", nCert ? `${nCert} certidão(ões) vencendo` : ""].filter(Boolean).join(" · ");
@@ -3576,7 +3576,7 @@ const FASES_AND = [
   { k: "proposta", nome: "Proposta enviada", cor: "#0EA5E9" },
   { k: "analise_proposta", nome: "Análise de proposta", cor: "#0B83B2" },
   { k: "diligencia", nome: "Diligência", cor: "#D97706" },
-  { k: "habilitacao", nome: "Análise de documentos", cor: "#7C3AED" },
+  { k: "habilitacao", nome: "Análise de documentos", cor: "#16A34A" },
   { k: "recurso", nome: "Recurso / contrarrecurso", cor: "#DC2626" },
   { k: "suspensa", nome: "Suspensa", cor: "#475569", extra: true },
   { k: "homologacao", nome: "Homologação / contrato", cor: "#4D7C0F" }
@@ -3810,7 +3810,7 @@ function gerarCardRecurso(id) {
   const ordemTipos = Object.keys(TIPOS_REC);
   const recs = [...(g.recursos || [])].sort((a, b) => ordemTipos.indexOf(a.tipo) - ordemTipos.indexOf(b.tipo) || a.em.localeCompare(b.em));
   const hist = [...(g.historico || [])].reverse().slice(0, 6);
-  const cores = { recurso: "#DC2626", contra: "#7C3AED", decisao: "#4D7C0F" };
+  const cores = { recurso: "#DC2626", contra: "#16A34A", decisao: "#4D7C0F" };
   const fato = (rot, val) => `<div class="fato"><span>${rot}</span><b>${val ? e(String(val)) : "—"}</b></div>`;
   const nomeArq = `Recurso ${nomeRelatorio(g)}`.replace(/[\\/:*?"<>|]+/g, "-").slice(0, 90);
   const desc = g.desconto !== null && g.desconto !== undefined && g.desconto !== "" ? pct(g.desconto) : "";
