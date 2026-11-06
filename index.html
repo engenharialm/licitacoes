@@ -209,6 +209,10 @@
   .badge.semana{background:#1565C0;color:#fff;}
   .card .value.nova{color:#1565C0;}
   .decide-item.nova{background:#E1F0FF;box-shadow:inset 4px 0 0 #1565C0;}
+  .decide-item.suspensa{background:#FEF3C7;box-shadow:inset 4px 0 0 #F59E0B;}
+  .card .value.suspensa{color:#B45309;}
+  .susp-chk{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:.66rem;font-weight:600;color:var(--text-dim);cursor:pointer;white-space:nowrap;}
+  .susp-chk input{margin:0;cursor:pointer;accent-color:#F59E0B;}
   tbody tr.row-sim td:first-child{box-shadow:inset 3px 0 0 var(--accent);}
   .table-wrap{overflow:auto;max-height:calc(100vh - 230px);}
   .rolar-lados{display:flex;gap:6px;}
@@ -739,6 +743,7 @@
   .badge.semana{background:#1E88E5;color:#fff}
   .card .value.nova{color:#7DB2FF}
   .decide-item.nova{background:#10335A;box-shadow:inset 4px 0 0 #3DF2FF}
+  .decide-item.suspensa{background:#3D3110;box-shadow:inset 4px 0 0 #F59E0B}
   .av-bt{background:rgba(255,255,255,.04)}
   .toast-acao{color:var(--lm-cyan);border-color:var(--lm-cyan)}
   .int-btn.sim.on{background:#0B6E99;border-color:#0B6E99;color:#fff}
@@ -1013,6 +1018,7 @@
             <option value="ativos">Pendentes + vamos participar</option>
             <option value="pendentes">Só aguardando decisão</option>
             <option value="novas">Só novas da semana</option>
+            <option value="suspensas">Só suspensas</option>
             <option value="sim">Só interesse SIM</option>
             <option value="todos">Todas (menos a lixeira)</option>
             <option value="nao">🗑 Lixeira (interesse NÃO)</option>
@@ -1097,6 +1103,10 @@
         <div class="field">
           <label>Resultado (opcional)</label>
           <select id="m-status"></select>
+        </div>
+        <div class="field">
+          <label>Situação</label>
+          <label class="susp-chk" style="font-size:.8rem;margin-top:8px;"><input type="checkbox" id="m-suspensa"> Licitação suspensa</label>
         </div>
         <div class="field">
           <label>Órgão / cliente *</label>
@@ -1898,7 +1908,7 @@ function servicosDetectados(l) {
 function isAtiva(l) {
   if (!automatica(l)) return !STATUS_FINAIS.includes(l.status);
   if (l.origem === "PNCP" && l.naListaPncp === false) return false;
-  if (l.suspensa) return true;   // suspensa continua no controle até ser retomada, revogada ou anulada
+  if (estaSuspensa(l)) return true;   // suspensa continua no controle até ser retomada, revogada ou anulada
   if (l.origem === "ALERTA" && l.naListaAlerta === false) return false;
   return !l.dataSessao || l.dataSessao >= localIso(new Date());
 }
@@ -2211,8 +2221,13 @@ function interesseBotoes(l) {
   </div>`;
 }
 
+// suspensa pelo PNCP (atualização automática) ou marcada à mão pela equipe na caixinha "Suspensa"
+function estaSuspensa(l) { return !!(l.suspensa || l.suspensaManual); }
+function suspensaCaixa(l) {
+  return `<label class="susp-chk" data-susp="${escapeHtml(l.id)}" title="${l.suspensa ? "Suspensa no PNCP" : "Marcar como suspensa"}"><input type="checkbox" ${estaSuspensa(l) ? "checked" : ""}> Suspensa</label>`;
+}
 function prazoBadge(l) {
-  if (l.suspensa) return `<span class="badge danger" title="Situação no PNCP: ${escapeHtml(l.pncp?.situacao || "Suspensa")}">SUSPENSA</span>`;
+  if (estaSuspensa(l)) return `<span class="badge warn" title="${l.suspensa ? `Situação no PNCP: ${escapeHtml(l.pncp?.situacao || "Suspensa")}` : "Marcada como suspensa pela equipe"}">SUSPENSA</span>`;
   const remarcada = l.remarcacao ? `<span class="badge warn" title="Remarcada em ${fmtDateTime(l.remarcacao.em).slice(0, 10)}">REMARCADA · antes ${fmtDateTime(l.remarcacao.de).slice(0, 10)}</span>` : "";
   const conferir = l.disputaEdital?.conferir && !(l.camposEditados || []).includes("dataSessao")
     ? `<span class="badge grey" title="O horário da disputa não foi achado no edital: a data mostrada é o fim do envio de propostas no PNCP">horário a conferir</span>` : "";
@@ -2237,12 +2252,14 @@ function renderDashboard() {
   const semana = base.filter(l => (isPendente(l) || (isSim(l) && !STATUS_FINAIS.includes(l.status))) && (() => { const d = diasAte(l.dataSessao); return d !== null && d >= 0 && d <= 7; })());
   const valorDisputa = simAndamento.reduce((s, l) => s + (Number(l.valor) || 0), 0);
   const novas = base.filter(novaDaSemana).length;
+  const suspensas = base.filter(l => estaSuspensa(l) && (isPendente(l) || isSim(l))).length;
 
   const cards = [
     { label: "Aguardando decisão", value: pend.length, cls: "warn", sub: "sem SIM ou NÃO", go: "pendentes" },
     { label: "Novas da semana", value: novas, cls: novas ? "nova" : "", sub: "entraram desde segunda, sem decisão", go: "novas" },
     { label: "Vamos participar", value: simAndamento.length, cls: "accent", sub: "interesse SIM em andamento", go: "sim" },
     { label: "Sessões em 7 dias", value: semana.length, cls: "", sub: "pendentes + vamos participar", go: "prazo7" },
+    { label: "Suspensas", value: suspensas, cls: suspensas ? "suspensa" : "", sub: "aguardando retomada", go: "suspensas" },
     { label: "Valor em disputa", value: fmtMoneyCurto(valorDisputa), cls: "accent", sub: "soma das que vamos participar" },
   ];
   document.getElementById("dash-cards").innerHTML = cards.map(c => `
@@ -2282,7 +2299,7 @@ function renderDashboard() {
 function itemDashHtml(l) {
   const data = fmtDateTime(l.dataSessao);
   const nova = novaDaSemana(l);
-  return `<div class="decide-item ${nova ? "nova" : ""}" data-edit="${escapeHtml(l.id)}" title="${nova ? "Entrou nesta semana — " : ""}Clique para ver os detalhes e decidir">
+  return `<div class="decide-item ${estaSuspensa(l) ? "suspensa" : nova ? "nova" : ""}" data-edit="${escapeHtml(l.id)}" title="${nova ? "Entrou nesta semana — " : ""}Clique para ver os detalhes e decidir">
       <div><div style="font-weight:600;font-size:.76rem;">${data.slice(0, 10) || "sem data"}</div>${data.length > 10 ? `<div class="muted small">${data.slice(11)}</div>` : ""}${prazoBadge(l)}${nova ? `<div><span class="badge semana">NOVA</span></div>` : ""}</div>
       <div style="min-width:0;">
         <div class="cid">${escapeHtml(cidadeExibicao(l) || l.cidade || "Local a conferir")}</div>
@@ -2377,6 +2394,7 @@ function getFiltered() {
     if (fInt === "ativos" && !(isPendente(l) || isSim(l) || (!automatica(l) && l.interesse !== "NAO"))) return false;
     if (fInt === "pendentes" && !isPendente(l)) return false;
     if (fInt === "novas" && !novaDaSemana(l)) return false;
+    if (fInt === "suspensas" && !estaSuspensa(l)) return false;
     if (fInt === "sim" && !isSim(l)) return false;
     if (fInt === "nao" && l.interesse !== "NAO") return false;
     if (fInt !== "nao" && l.interesse === "NAO") return false;   // marcadas NÃO só aparecem na lixeira
@@ -2836,7 +2854,7 @@ function renderTabela() {
     return `
     <tr class="${l.interesse === "NAO" ? "row-nao" : l.interesse === "SIM" ? "row-sim" : novo ? "row-nova" : ""}" data-edit="${escapeHtml(l.id)}" title="${novo ? "Entrou nesta semana e ainda não tem decisão — " : ""}Clique para ver os detalhes">
       <td>${interesseBotoes(l)}</td>
-      <td class="nowrap"><b>${fmtDateTime(l.dataSessao) || "—"}</b><div class="badges">${prazoBadge(l)}${novo ? `<span class="badge semana">NOVA DA SEMANA</span>` : ""}</div></td>
+      <td class="nowrap"><b>${fmtDateTime(l.dataSessao) || "—"}</b><div class="badges">${prazoBadge(l)}${novo ? `<span class="badge semana">NOVA DA SEMANA</span>` : ""}</div>${suspensaCaixa(l)}</td>
       <td>${escapeHtml(l.orgao)}${p.esfera ? `<div class="muted small">${escapeHtml(p.esfera)}</div>` : l.origem === "ALERTA" ? `<div class="muted small">via Alerta Licitação</div>` : !automatica(l) ? `<div class="muted small">privada / manual</div>` : ""}</td>
       <td>${escapeHtml(cidadeExibicao(l))}${ehSedeDoOrgao(l) && municipiosDe(l).length ? `<div class="muted small" title="${escapeHtml(l.cidade)}">local da obra pelo objeto · órgão em ${escapeHtml((l.cidade || "").replace(/\s*\(.*$/, ""))}</div>` : ""}${regiaoHtml(l)}</td>
       <td>${escapeHtml(l.numero)}${l.modalidade ? `<div class="muted small">${escapeHtml(l.modalidade)}</div>` : ""}</td>
@@ -2905,6 +2923,20 @@ function rotularTabela(tbody) {
 }
 
 /* ------------------------------ interesse SIM / NÃO ------------------------------ */
+async function setSuspensa(id) {
+  const l = licitacoes.find(x => x.id === id);
+  if (!l || !requireUnlock()) return;
+  const marcar = !estaSuspensa(l);
+  // desmarcar também tira a suspensão vinda do PNCP; se ela continuar suspensa lá, a próxima atualização marca de novo
+  const data = { suspensaManual: marcar, ...(marcar ? {} : { suspensa: false }), atualizadoEm: new Date().toISOString() };
+  try {
+    await store.update(id, data);
+    Object.assign(l, data);
+    renderAll();
+    toast(marcar ? "Marcada como suspensa." : "Suspensão retirada.");
+  } catch (e) { toast(e.message || "Erro ao salvar.", true); }
+}
+
 async function setInteresse(id, valor) {
   const l = licitacoes.find(x => x.id === id);
   if (!l) return;
@@ -2963,6 +2995,7 @@ function abrirModal(id) {
   document.getElementById("m-garantia").value = l.garantiaProposta || "";
   document.getElementById("m-vencedora").value = l.vencedora || "";
   document.getElementById("m-link").value = l.linkPortal || "";
+  document.getElementById("m-suspensa").checked = estaSuspensa(l);
 
   const box = document.getElementById("m-pncp-box");
   const p = l.pncp;
@@ -3019,8 +3052,11 @@ async function salvarModal(paraAndamento = false) {
     garantiaProposta: document.getElementById("m-garantia").value.trim(),
     vencedora: document.getElementById("m-vencedora").value.trim(),
     linkPortal: document.getElementById("m-link").value.trim(),
+    // marcada pelo PNCP não vira marcação manual: quando o PNCP retomar, a caixinha desmarca sozinha
+    suspensaManual: document.getElementById("m-suspensa").checked && !licitacoes.find(x => x.id === editingId)?.suspensa,
     atualizadoEm: new Date().toISOString()
   };
+  if (!document.getElementById("m-suspensa").checked) dados.suspensa = false;
   try {
     if (editingId) {
       const atual = licitacoes.find(x => x.id === editingId);
@@ -4931,6 +4967,7 @@ function irPara(go) {
   if (go === "pendentes") fInt.value = "pendentes";
   else if (go === "sim") fInt.value = "sim";
   else if (go === "novas") fInt.value = "novas";
+  else if (go === "suspensas") fInt.value = "suspensas";
   else if (go === "prazo7") { fInt.value = "ativos"; fPrazo.value = "7"; }
   renderTabela();
   mostrarView("controle");
@@ -4938,6 +4975,8 @@ function irPara(go) {
 
 document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => mostrarView(t.dataset.view)));
 document.addEventListener("click", e => {
+  const susp = e.target.closest("[data-susp]");
+  if (susp) { e.preventDefault(); setSuspensa(susp.dataset.susp); return; }
   const intBtn = e.target.closest(".int-btn[data-int]");
   if (intBtn) { setInteresse(intBtn.dataset.id, intBtn.dataset.int); return; }
   const atPdf = e.target.closest("[data-at-pdf]");
