@@ -1162,6 +1162,15 @@
           <input type="text" id="m-link" placeholder="https://...">
           <div id="m-atalhos" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;"></div>
         </div>
+        <div class="field full" id="m-estudo-box">
+          <label>Nosso estudo (PDF) <span class="muted small" style="font-weight:500;">apresentação / estudo de viabilidade da LM — até 40 MB</span></label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+            <span id="m-estudo-info" class="muted small" style="flex:1;min-width:180px;"></span>
+            <button type="button" class="btn btn-ghost btn-sm" id="m-estudo-abrir" hidden>Abrir estudo</button>
+            <label class="btn btn-ghost btn-sm" style="cursor:pointer;margin:0;"><span id="m-estudo-rot">Anexar PDF</span><input type="file" id="m-estudo-pdf" accept="application/pdf,.pdf" hidden></label>
+            <button type="button" class="btn btn-danger-ghost btn-sm" id="m-estudo-tirar" hidden>Retirar</button>
+          </div>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -1746,7 +1755,7 @@ if (LINK_PDF.get("pdf")) {
   caixa("Abrindo o arquivo…");
   try {
     const doc = LINK_PDF.get("pdf"), n = Math.min(80, Number(LINK_PDF.get("partes")) || 1);
-    if (!/^recpdf-[\w-]+$/.test(doc)) throw new Error("Link inválido.");
+    if (!/^(recpdf|estpdf)-[\w-]+$/.test(doc)) throw new Error("Link inválido.");
     const partes = await Promise.all(Array.from({ length: n }, (_, i) => store.getMeta(`${doc}-${i}`)));
     if (partes.some(d => !d?.base64)) throw new Error("Arquivo não encontrado. Ele pode ter sido retirado do processo.");
     const url = URL.createObjectURL(new Blob(partes.map(d => Uint8Array.from(atob(d.base64), c => c.charCodeAt(0))), { type: "application/pdf" }));
@@ -2602,6 +2611,7 @@ async function gerarCard(id) {
     safeUrl(p?.linkPncp) ? ["Página no PNCP (todos os anexos)", p.linkPncp, ""] : null,
     safeUrl(l.linkPortal) ? ["Portal de origem", l.linkPortal, ""] : null,
     safeUrl(a?.link) ? ["Alerta Licitação", a.link, ""] : null,
+    l.estudo?.doc ? ["Nosso estudo (LM)", linkEstudo(l.estudo), l.estudo.nome] : null,
     ...(l.documentos || []).filter(d => safeUrl(d.url) && d.url !== edital?.url && d.url !== planilha?.url).map(d => [d.titulo || "Link", d.url, ""])
   ].filter(Boolean);
   const fato = (rot, val) => `<div class="fato"><span>${rot}</span><b>${val ? e(String(val)) : "—"}</b></div>`;
@@ -2713,6 +2723,57 @@ async function gerarCard(id) {
 }
 
 // botões Edital / Planilha / Portal no formulário de edição
+/* nosso estudo (PDF) ligado à licitação: guardado em partes no banco, como os atestados */
+const linkEstudo = e => `${location.origin}${location.pathname}?pdf=${encodeURIComponent(e.doc)}&partes=${e.partes}&nome=${encodeURIComponent(e.nome || "estudo.pdf")}`;
+function renderEstudoModal(l) {
+  const e = l?.estudo;
+  document.getElementById("m-estudo-box").hidden = !editingId;
+  document.getElementById("m-estudo-info").textContent = e?.doc
+    ? `${e.nome} (${(e.tam / 1048576).toFixed(1).replace(".", ",")} MB) · anexado em ${new Date(e.em).toLocaleDateString("pt-BR")}`
+    : "Nenhum estudo anexado.";
+  document.getElementById("m-estudo-abrir").hidden = !e?.doc;
+  document.getElementById("m-estudo-tirar").hidden = !e?.doc;
+  document.getElementById("m-estudo-rot").textContent = e?.doc ? "Trocar PDF" : "Anexar PDF";
+  document.getElementById("m-estudo-pdf").value = "";
+}
+async function anexarEstudo(arquivo) {
+  const l = licitacoes.find(x => x.id === editingId);
+  if (!l || !arquivo) return;
+  if (!/\.pdf$/i.test(arquivo.name) && arquivo.type !== "application/pdf") { toast("Escolha um arquivo PDF.", true); renderEstudoModal(l); return; }
+  if (arquivo.size > ATEST_PDF_MAX) { toast("PDF acima de 40 MB.", true); renderEstudoModal(l); return; }
+  if (!requireUnlock()) { renderEstudoModal(l); return; }
+  const info = document.getElementById("m-estudo-info");
+  try {
+    const anterior = l.estudo;
+    const estudo = { doc: `estpdf-${l.id}-${Date.now().toString(36)}`, nome: arquivo.name, tam: arquivo.size, em: new Date().toISOString() };
+    estudo.partes = await salvarArquivoPartes(estudo.doc, arquivo, (i, n) => { info.textContent = `Enviando ${i}/${n}…`; });
+    await store.update(l.id, { estudo });
+    l.estudo = estudo;
+    // o PDF antigo (troca) sai do banco
+    if (anterior?.doc) Promise.all(Array.from({ length: anterior.partes || 0 }, (_, i) => store.removeMeta(`${anterior.doc}-${i}`))).catch(() => {});
+    renderEstudoModal(l); renderTabela();
+    toast("Estudo anexado à licitação.");
+  } catch (e) { toast(e.message || "Erro ao anexar o estudo.", true); renderEstudoModal(l); }
+}
+async function retirarEstudo() {
+  const l = licitacoes.find(x => x.id === editingId);
+  if (!l?.estudo?.doc || !confirm(`Retirar o estudo "${l.estudo.nome}" desta licitação?`) || !requireUnlock()) return;
+  try {
+    const e = l.estudo;
+    await store.update(l.id, { estudo: null });
+    l.estudo = null;
+    Promise.all(Array.from({ length: e.partes || 0 }, (_, i) => store.removeMeta(`${e.doc}-${i}`))).catch(() => {});
+    renderEstudoModal(l); renderTabela();
+    toast("Estudo retirado.");
+  } catch (err) { toast(err.message || "Erro ao retirar.", true); }
+}
+document.getElementById("m-estudo-pdf").addEventListener("change", ev => anexarEstudo(ev.target.files[0]));
+document.getElementById("m-estudo-tirar").addEventListener("click", retirarEstudo);
+document.getElementById("m-estudo-abrir").addEventListener("click", () => {
+  const l = licitacoes.find(x => x.id === editingId);
+  if (l?.estudo?.doc) window.open(linkEstudo(l.estudo), "_blank", "noopener");
+});
+
 async function renderAtalhosDocs(l) {
   const box = document.getElementById("m-atalhos");
   const portal = safeUrl(l.linkPortal);
@@ -2871,6 +2932,7 @@ function renderTabela() {
       <td class="no-print"><div class="row-actions">
         <button class="icon-btn" data-edit="${escapeHtml(l.id)}" title="Editar / preencher">Editar</button>
         <button class="icon-btn" data-docs="${escapeHtml(l.id)}" title="Edital, planilha e demais arquivos">Documentos</button>
+        ${l.estudo?.doc ? `<a class="icon-btn" href="${escapeHtml(linkEstudo(l.estudo))}" target="_blank" rel="noopener" title="Nosso estudo: ${escapeHtml(l.estudo.nome)}">Estudo LM</a>` : ""}
         ${linkPncp ? `<a class="icon-btn" href="${escapeHtml(linkPncp)}" target="_blank" rel="noopener" title="Abrir no PNCP (edital e anexos)">PNCP</a>` : ""}
         ${linkAlerta ? `<a class="icon-btn" href="${escapeHtml(linkAlerta)}" target="_blank" rel="noopener" title="Abrir no Alerta Licitação">Alerta</a>` : ""}
         ${linkPortal ? `<a class="icon-btn" href="${escapeHtml(linkPortal)}" target="_blank" rel="noopener" title="Abrir portal de origem">Portal</a>` : ""}
@@ -2978,6 +3040,7 @@ function abrirModal(id) {
   editingId = id || null;
   const l = id ? licitacoes.find(x => x.id === id) : { origem: "MANUAL", interesse: "SIM", servicos: [] };
   document.getElementById("modal-lic-title").textContent = id ? "Licitação" : "Nova licitação (privada / manual)";
+  renderEstudoModal(l);
   setModalInteresse(l.interesse || "");
   document.getElementById("m-data").value = (l.dataSessao || "").slice(0, 16);
   const selStatus = document.getElementById("m-status");
