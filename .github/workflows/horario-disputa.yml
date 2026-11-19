@@ -1,5 +1,7 @@
-# Lê o horário da disputa nos editais do PNCP e grava no controle (scripts/horario_disputa.py).
-# Roda sozinho 3 vezes por dia; também dá para rodar na hora em Actions → "Horário da disputa" → Run workflow.
+# Robô do controle de licitações, 3 vezes por dia (também dá para rodar na hora em Actions → "Horário da disputa" → Run workflow):
+#  1. scripts/triagem_documentos.py — lê edital/TR/planilhas das obras viárias que o objeto não denuncia
+#     (subleito, base/sub-base, BGS, imprimação, CBUQ...) e inclui as oportunidades no controle;
+#  2. scripts/horario_disputa.py — lê o horário da disputa nos editais e grava no controle.
 name: Horário da disputa
 
 on:
@@ -10,11 +12,16 @@ on:
 jobs:
   ler-editais:
     runs-on: ubuntu-latest
-    timeout-minutes: 40
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install pypdf==5.1.0
-      - run: python scripts/horario_disputa.py
+      - run: pip install pypdf==5.1.0 openpyxl==3.1.5
+      - name: Triagem pelos documentos
+        working-directory: scripts
+        run: python triagem_documentos.py
+        continue-on-error: true   # se falhar, o horário da disputa ainda roda
+      - name: Horário da disputa
+        run: python scripts/horario_disputa.py

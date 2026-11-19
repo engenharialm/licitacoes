@@ -211,6 +211,8 @@
   .decide-item.nova{background:#E1F0FF;box-shadow:inset 4px 0 0 #1565C0;}
   .decide-item.suspensa{background:#FFFF99;box-shadow:inset 7px 0 0 #FFFF00;}
   .card .value.suspensa{color:#D4A000;}
+  .badge.prio-alta{background:#0B83B2;color:#fff;font-weight:700;}
+  .motivo-lm{margin-top:4px;line-height:1.35;}
   .card .value.decidir{color:#00B300;}
   .badge.suspensa{background:#FFFF00;color:#1F2937;font-weight:800;}
   .susp-chk{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:.66rem;font-weight:600;color:var(--text-dim);cursor:pointer;white-space:nowrap;}
@@ -1885,10 +1887,33 @@ function ehAquisicaoMaterial(objeto) {
   return /\b(aquisicao|compra)\b/.test(ini) && !/execucao|executar|prestacao de servico|e aplicacao|aplicacao de/.test(ini);
 }
 function norm(s) { return (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); }
+// serviços da atividade da LM, com o nome que aparece como motivo da inclusão. A obra é reconhecida pelo
+// conjunto de serviços (subleito, base, BGS, imprimação...), não só pelas palavras "asfalto"/"pavimentação".
+// A mesma lista é usada pelo robô que lê edital e planilhas (scripts/triagem_documentos.py) — manter as duas iguais.
+const SERVICOS_LM = [
+  { nome: "Pavimentação asfáltica", rx: /pavimentacao asfaltica|asfalt/, alta: true },
+  { nome: "CBUQ / concreto asfáltico", rx: /\bcbuq\b|\bcauq\b|concreto (betuminoso|asfaltico)/, alta: true },
+  { nome: "Recapeamento", rx: /recapeamento/, alta: true },
+  { nome: "Restauração / recuperação / reforço de pavimento", rx: /(restaura|recupera|reforc|melhoria estrutural)\w* (estrutural )?(d[aeo]s? |de )?pavimen/, alta: true },
+  { nome: "Regularização e compactação de subleito", rx: /sub-?\s?leito/, alta: true },
+  { nome: "Base / sub-base", rx: /sub-?\s?base|base granular|base estabilizada|base (de|em) (brita|solo)|base e sub/, alta: true },
+  { nome: "BGS / brita graduada", rx: /brita graduada|\bbgs\b|\bbgtc\b/, alta: true },
+  { nome: "Solo-brita / solo-cimento / estabilização granulométrica", rx: /solo\s*-?\s*(brita|cimento)|estabiliza\w* granulometric/, alta: true },
+  { nome: "Imprimação / pintura de ligação", rx: /imprimacao|pintura de ligacao/, alta: true },
+  { nome: "PMF / tratamento superficial / microrrevestimento", rx: /\bpmf\b|pre-?\s?misturado|tratamento superficial|\btsd\b|\btss\b|micro\s*-?\s*revestimento|microrrevestimento/, alta: true },
+  { nome: "Tapa-buracos", rx: /tapa\s*-?\s*buracos?/, alta: true },
+  { nome: "Fresagem", rx: /fresagem/, alta: true },
+  { nome: "Pavimentação", rx: /pavimenta/, alta: false },
+  { nome: "Conservação / manutenção / melhoria de vias e estradas", rx: /(conserva|manuten|recupera|melhoria|reforma|readequa|restaura)\w* (d[aeo]s? |de |em |nas? )?(malha viaria|vias?|estradas?|rodovias?|ruas?|vicinais?|logradouros?|pistas? de rolamento)\b/, alta: false },
+];
+function servicosLm(texto) { return SERVICOS_LM.filter(s => s.rx.test(texto)); }
 function classificar(objeto) {
   const n = norm(objeto).replace(RX.neutro, " ");
   const pavExtra = ((RX.pavimento.test(n) && RX.via.test(n)) || RX.viario.test(n)) && !RX.predio.test(n);
-  const pav = RX.pav.test(n) || pavExtra, ter = RX.ter.test(n), dre = RX.dre.test(n) && RX.dreCtx.test(n);
+  const achados = servicosLm(n);
+  // conservação/manutenção de vias de prédio ("reforma da escola ... vias de acesso") não conta
+  const servicos = achados.filter(s => s.alta || !RX.predio.test(n));
+  const pav = RX.pav.test(n) || pavExtra || servicos.length > 0, ter = RX.ter.test(n), dre = RX.dre.test(n) && RX.dreCtx.test(n);
   const asfalto = RX.asf.test(n);
   // só pavimentação asfáltica; drenagem e terraplenagem entram apenas junto com pavimentação
   if (!pav) return null;
@@ -1898,7 +1923,11 @@ function classificar(objeto) {
   if (RX.tec.test(n) && !/integrada/.test(n)) return null;
   if (ehAquisicaoMaterial(objeto)) return null;
   const chave = n.replace(/^\s*\[[^\]]*\]\s*-?\s*/, "").replace(/[^a-z0-9]/g, "");
-  return { pav, ter, dre, asfalto, chave };
+  const nomes = servicos.map(s => s.nome);
+  if (!nomes.length) nomes.push(pavExtra ? "Infraestrutura / obra viária" : "Pavimentação");
+  // prioridade alta: pavimentação, recapeamento, recuperação asfáltica, base/sub-base/subleito
+  const prioridade = servicos.some(s => s.alta) || RX.pav.test(n) ? "alta" : "normal";
+  return { pav, ter, dre, asfalto, chave, motivo: "Objeto: " + nomes.join(", "), prioridade };
 }
 function servicosIniciais(c) {
   const lista = [];
@@ -2884,13 +2913,32 @@ async function removerDocumento(i) {
   } catch (e) { toast(e.message || "Erro ao remover o link.", true); }
 }
 
+// nome da plataforma de disputa pelo link de origem
+const PLATAFORMAS = [[/licitardigital|licitar\.digital/, "Licitar Digital"], [/cnetmobile|comprasnet|compras\.gov/, "Compras.gov.br"],
+  [/portaldecompraspublicas/, "Portal de Compras Públicas"], [/licitanet/, "Licitanet"], [/bll\.org|bllcompras/, "BLL Compras"],
+  [/liciteai/, "Licite AI"], [/licitapp/, "LicitApp"], [/novobbmnet|bbmnet/, "BBMNET"], [/slicx/, "Slicx"], [/licitacoes-e|bb\.com\.br/, "Licitações-e (BB)"],
+  [/ammlicita|amm\b/, "AMM Licita"], [/licita\.mg|compras\.mg/, "Compras MG"], [/sh3|pregao\.?online/, "SH3"], [/bnc\b|bnccompras/, "BNC"]];
+function plataformaDe(l) {
+  const url = fonte(l).linkOrigem || l.linkPortal || "";
+  if (fonte(l).portalNome) return fonte(l).portalNome;
+  const hit = PLATAFORMAS.find(([rx]) => rx.test(url));
+  if (hit) return hit[1];
+  try { return url ? new URL(url).hostname.replace(/^www\./, "") : ""; } catch { return ""; }
+}
+function motivoInclusao(l) { return l.triagem?.motivo || fonte(l).motivo || ""; }
+function prioridadeDe(l) { return l.triagem?.prioridade || fonte(l).prioridade || ""; }
 function objetoBadges(l) {
   const p = fonte(l);
   const b = [];
+  if (prioridadeDe(l) === "alta") b.push(`<span class="badge prio-alta" title="Pavimentação, recapeamento, recuperação asfáltica, subleito ou base/sub-base">PRIORIDADE ALTA</span>`);
+  if (l.triagem?.anexos === "inacessiveis") b.push(`<span class="badge warn" title="Os anexos não puderam ser lidos (sem PDF, compactado ou digitalizado) — a licitação não foi descartada">anexos não lidos — conferir</span>`);
+  const motivo = motivoInclusao(l), plat = plataformaDe(l);
+  const extra = [motivo ? `<b>Motivo:</b> ${escapeHtml(motivo)}` : "", plat ? `<b>Plataforma:</b> ${escapeHtml(plat)}` : "",
+    p.situacao && !/divulgada/i.test(p.situacao) ? `<b>Situação:</b> ${escapeHtml(p.situacao)}` : ""].filter(Boolean);
   // o tipo confirmado no edital vale mais que a leitura do objeto
   if (l.tipoPavimentoEdital === "misto") b.push(`<span class="badge warn">asfalto + calçamento</span>`);
   else if (l.tipoPavimentoEdital !== "asfaltico" && p.asfalto === false) b.push(`<span class="badge warn" title="O objeto não diz se é asfáltica — conferir no edital">tipo de pavimento não informado — conferir</span>`);
-  return b.length ? `<div class="badges">${b.join("")}</div>` : "";
+  return (b.length ? `<div class="badges">${b.join("")}</div>` : "") + (extra.length ? `<div class="muted small motivo-lm">${extra.join(" · ")}</div>` : "");
 }
 
 function renderTabela() {
@@ -3188,7 +3236,7 @@ function montarPncp(it, c, vezes) {
     linkOrigem: safeUrl(it.linkSistemaOrigem) || "",
     portalNome: prefixo,
     linkPncp: `https://pncp.gov.br/app/editais/${it.orgaoEntidade?.cnpj}/${it.anoCompra}/${it.sequencialCompra}`,
-    pav: c.pav, ter: c.ter, dre: c.dre, asfalto: c.asfalto,
+    pav: c.pav, ter: c.ter, dre: c.dre, asfalto: c.asfalto, motivo: c.motivo, prioridade: c.prioridade,
     publicadoVezes: vezes,
     ibge: String(it.unidadeOrgao?.codigoIbge || "")
   };
