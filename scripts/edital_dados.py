@@ -37,19 +37,25 @@ def extrair(texto):
             break
     d["impugnacao"] = imp
 
-    # garantia de PROPOSTA (não confundir com garantia de execução do contrato)
-    gar = NI
-    for m in re.finditer(r"garantia (de|da) proposta", t):
-        j = t[m.start():m.start() + 300]
-        if re.search(r"nao sera exigid|dispensad|nao exigir", j[:150]):
+    # garantia de PROPOSTA (não confundir com garantia de execução do contrato nem garantia adicional)
+    gar, pct = NI, None
+    for m in re.finditer(r"garantia (de|da|para (a )?participacao|de participacao)\s*(proposta|participacao|na licitacao)?", t):
+        j = t[m.start():m.start() + 350]
+        if not re.search(r"proposta|participacao", j[:60]):
+            continue
+        if re.search(r"nao sera exigid|dispensad|nao exigir|nao havera|sem exigencia", j[:200]):
             gar = "não exigida"
             break
         p = re.search(r"(\d+(?:[,.]\d+)?)\s*%", j)
         v = re.search(r"r\$\s*([\d.]+,\d{2})", j)
-        if p or v:
-            gar = (f"{p.group(1).replace('.', ',')}% do valor estimado" if p else "") + (" · " if p and v else "") + (f"R$ {v.group(1)}" if v else "")
+        if p and float(p.group(1).replace(",", ".")) <= 5:
+            pct = float(p.group(1).replace(",", "."))
+            gar = f"{p.group(1).replace('.', ',')}% do valor estimado"
             break
-    d["garantia"] = gar
+        if v:
+            gar = f"R$ {v.group(1)}"
+            break
+    d["garantia"], d["garantiaPct"] = gar, pct
 
     m = re.search(r"modo de disputa\W{0,30}(?:sera|e|:)?\W{0,10}(aberto e fechado|fechado e aberto|aberto|fechado)", t)
     d["modoDisputa"] = m.group(1) if m else NI
@@ -66,16 +72,27 @@ def extrair(texto):
                 break
     d["usina"] = usina
 
-    # atestado de capacidade técnica: parcelas de maior relevância com quantidade
+    # atestado de capacidade técnica: parcelas de maior relevância com quantidade mínima
+    UN = r"(m2|m²|m3|m³|toneladas|ton\b|t\b|km\b|metros quadrados|metros cubicos|metros lineares|ml\b|m\b|unidades?|un\b)"
+    SERV_ATESTADO = r"pavimen|cbuq|asfalt|betumin|base|sub-?base|subleito|imprima|pintura de ligacao|meio-?fio|sarjeta|drenag|concreto|fresag|recape|terraplen|escava|tubo|bloquete|intertravad|calcamento|reperfil|tratamento superficial|regulariza|compacta|aterro|ponte|galeria|sinaliza|lama asfaltica|microrrevest|remendo|tapa"
     qts = []
-    for m in re.finditer(r"capacidade tecnica|parcelas? de maior relevancia|atestado", t):
-        j = t[m.start():m.start() + 1500]
-        for q in re.finditer(r"([a-z][a-z ,()/-]{6,70}?)\W{1,6}(?:minimo de |quantidade minima de |de )?(\d{1,3}(?:\.\d{3})*(?:,\d+)?)\s*(m2|m²|m3|m³|toneladas|ton\b|t\b|km\b|metros quadrados|metros cubicos)", j):
-            nome = re.sub(r"^(e|de|com|em|o|a|os|as)\s+", "", q.group(1).strip(" ,-/"))
-            item = f"{nome} {q.group(2)} {q.group(3).replace('m2', 'm²').replace('m3', 'm³')}"
-            if item not in qts and len(nome) > 5:
+    for m in re.finditer(r"parcelas? de maior relevancia|capacidade tecnica[- ]operacional|capacidade tecnico[- ]operacional|atestados? de capacidade tecnica", t):
+        j = t[m.start():m.start() + 3000]
+        for q in re.finditer(r"(\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:,\d+)?)\s*" + UN, j):
+            antes = j[max(0, q.start() - 260):q.start()]
+            # tira o "quantidade igual ou superior a", "minimo de" etc. que fica entre o serviço e o número
+            antes = re.sub(r"(,?\s*(com |em )?(quantidade|quantitativo)s?( minim[ao]s?)?( igual ou superior a| de| equivalente a)?|exigencia minima|no minimo|minimo de|igual ou superior a|correspondente a)\W*$", "", antes.strip(" :;,-")).strip(" :;,-")
+            corte = max(antes.rfind(x) for x in (";", ": ", " - ", "a) ", "b) ", "c) ", "d) ", "e) ", "\u2022", ". "))
+            nome = antes[corte + 1:] if corte >= 0 else antes[-120:]
+            nome = re.sub(r"^[\W\d.]*(\w\)\s*)?", "", nome).strip(" ,-/.:")
+            # só linhas que são serviço de obra (evita e-mail, prazos, transporte de caminhão etc.)
+            if len(nome) < 8 or not re.search(SERV_ATESTADO, nome) or re.search(r"\b(prazo|dias|meses|anos|percent|valor|r\$|lei|resolucao|pagina|caminhao|transporte)\b", nome):
+                continue
+            un = q.group(2).replace("m2", "m²").replace("m3", "m³").replace("metros quadrados", "m²").replace("metros cubicos", "m³")
+            item = f"{nome[-110:]}: {q.group(1)} {un}"
+            if item not in qts:
                 qts.append(item)
         if qts:
             break
-    d["atestado"] = "; ".join(qts[:4]) if qts else NI
+    d["atestado"] = "; ".join(qts[:6]) if qts else NI
     return d

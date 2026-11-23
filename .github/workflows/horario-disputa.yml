@@ -6,6 +6,7 @@
 #  4. DER-MG         — scripts/der.py         (concorrências de der.mg.gov.br)
 #  depois: triagem_documentos.py (lê edital/TR/planilhas das obras que o objeto não denuncia)
 #          horario_disputa.py    (lê o horário da disputa nos editais)
+#          preencher_edital.py   (atestados e garantia de proposta: % e valor, lidos do edital/TR)
 name: Horário da disputa
 
 on:
@@ -48,3 +49,7 @@ jobs:
         continue-on-error: true   # se falhar, o horário da disputa ainda roda
       - name: Horário da disputa
         run: python scripts/horario_disputa.py
+        continue-on-error: true
+      - name: Atestados e garantia de proposta
+        working-directory: scripts
+        run: python preencher_edital.py
