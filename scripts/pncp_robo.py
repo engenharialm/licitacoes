@@ -57,6 +57,13 @@ def main():
         sigla = "dnit" if re.search(r"infra|dnit", org) else ("der" if "estradas de rodagem" in org else "")
         mnum = re.search(r"(\d+)\D*$", re.sub(r"/\d{4}\s*$", "", str(it.get("numeroCompra") or "0")))
         num = int(mnum.group(1)) if mnum else 0
+        pal = set(w for w in re.split(r"[^a-z0-9]+", h.norm(it.get("objetoCompra") or "")) if len(w) > 3)
+        def parecido(f):
+            q = set(w for w in re.split(r"[^a-z0-9]+", h.norm(f.get("objeto") or "")) if len(w) > 3)
+            return pal and q and len(pal & q) / len(pal | q) >= 0.4
+        if sigla and any(i.startswith(sigla + "_") and parecido(f) for i, f in existentes.items()):
+            print(f"já no controle pelo site do {sigla.upper()}: {quem}")
+            continue
         if sigla and any(i.startswith(sigla + "_") and re.search(rf"0*{num}/{it.get('anoCompra')}", f.get("numero") or "")
                          for i, f in existentes.items()):
             print(f"já no controle pelo site do {sigla.upper()}: {quem}")

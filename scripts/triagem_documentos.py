@@ -74,7 +74,7 @@ def objeto_aceito_pelo_site(n):
 
 def eh_aquisicao_material(n):
     ini = re.sub(r"destinad[oa]s? (a|para) (a )?(execucao|aplicacao)|para (a )?aplicacao", " ", n[:160])
-    return bool(re.search(r"\b(aquisicao|compra)\b", ini)) and not re.search(r"execucao|executar|prestacao de servico|e aplicacao|aplicacao de", ini)
+    return bool(re.search(r"\b(aquisicao|compra|fornecimento)\b", ini)) and not re.search(r"execucao|executar|prestacao de servico|e aplicacao|aplicacao de", ini)
 
 
 def candidata(objeto):
