@@ -10,6 +10,7 @@ from datetime import datetime, timedelta, timezone
 import horario_disputa as h
 import triagem_documentos as t
 from dnit import RX_FORA, RX_RODOVIARIO
+from entendimento import entender
 
 RX_CALC = re.compile(r"calcamento|bloquete|intertravad|sextavad|paralelep|polied|\bpedra\b|blocos? de concreto")
 RX_ASF = re.compile(r"asfalt|cbuq|betuminoso|recapeamento|microrrevestimento|tratamento superficial|\btsd\b|\bpmf\b|tapa\s*-?\s*buracos?|fresagem")
@@ -35,7 +36,8 @@ def classificar(objeto, orgao):
 def main():
     agora = datetime.now(timezone(timedelta(hours=-3))).strftime("%Y-%m-%dT%H:%M")
     itens = [it for it in t.abertas_mg() if (it.get("dataEncerramentoProposta") or "9")[:16] >= agora]
-    ids = {i for i, _ in h.licitacoes()}
+    existentes = {i: f for i, f in h.licitacoes()}
+    ids = set(existentes)
     grupos = {}
     for it in itens:
         org = (it.get("orgaoEntidade") or {}).get("razaoSocial", "") + " " + (it.get("unidadeOrgao") or {}).get("nomeUnidade", "")
@@ -43,15 +45,39 @@ def main():
         if not c:
             continue
         chave = it["orgaoEntidade"]["cnpj"] + "|" + re.sub(r"[^a-z0-9]", "", h.norm(re.sub(r"^\s*\[[^\]]*\]", "", it.get("objetoCompra") or "")))
-        g = grupos.setdefault(chave, [])
-        g.append((it, c))
+        grupos.setdefault(chave, []).append((it, c))
     novas = 0
     for g in grupos.values():
         if any(t.doc_id(it) in ids for it, _ in g):
             continue   # já está no controle (alguma das publicações)
         it, (motivo, prio) = max(g, key=lambda x: x[0].get("dataPublicacaoPncp") or "")
-        print(f"INCLUÍDA: {it['orgaoEntidade'].get('razaoSocial')} — {it.get('numeroCompra')}/{it.get('anoCompra')} | {motivo}")
-        t.gravar("licitacoes", t.doc_id(it), t.registro_pncp(it, motivo, prio, {"motivo": motivo, "prioridade": prio, "fonte": "PNCP (robô)"}))
+        quem = f"{it['orgaoEntidade'].get('razaoSocial')} — {it.get('numeroCompra')}/{it.get('anoCompra')}"
+        # mesma licitação já lançada pelo site do DNIT/DER (outro id): mesmo órgão e mesmo número/ano
+        org = h.norm(it["orgaoEntidade"].get("razaoSocial") or "")
+        sigla = "dnit" if re.search(r"infra|dnit", org) else ("der" if "estradas de rodagem" in org else "")
+        mnum = re.search(r"(\d+)\D*$", re.sub(r"/\d{4}\s*$", "", str(it.get("numeroCompra") or "0")))
+        num = int(mnum.group(1)) if mnum else 0
+        if sigla and any(i.startswith(sigla + "_") and re.search(rf"0*{num}/{it.get('anoCompra')}", f.get("numero") or "")
+                         for i, f in existentes.items()):
+            print(f"já no controle pelo site do {sigla.upper()}: {quem}")
+            continue
+        # entendimento prévio: que obra é; se o objeto não deixa claro, os documentos decidem
+        valor = it.get("valorTotalEstimado") or None
+        e = entender(it.get("objetoCompra") or "", valor)
+        anexos = "ok"
+        if e["perfil"] == "conferir" and not motivo.startswith("Órgão prioritário"):
+            texto, n_anexos, n_lidos = t.ler_anexos(it)
+            if n_lidos:
+                e = entender(it.get("objetoCompra") or "", valor, texto)
+            else:
+                anexos = "inacessiveis"
+        if e["perfil"] == "nao" and not motivo.startswith("Órgão prioritário"):
+            print(f"fora do perfil ({e['porque'] or e['tipo']}): {quem}")
+            continue
+        triagem = {"motivo": motivo + (f" — {e['porque']}" if e["porque"] else ""), "prioridade": prio, "fonte": "PNCP (robô)",
+                   "obra": e["resumo"], "anexos": anexos}
+        print(f"INCLUÍDA: {quem} | Obra: {e['resumo']} | {triagem['motivo']}")
+        t.gravar("licitacoes", t.doc_id(it), t.registro_pncp(it, motivo, prio, triagem))
         novas += 1
     print(f"{len(itens)} abertas em MG no PNCP; {novas} novas incluídas")
 

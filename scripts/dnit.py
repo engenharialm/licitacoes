@@ -14,6 +14,7 @@ from datetime import datetime, timedelta, timezone
 
 import horario_disputa as h
 import triagem_documentos as t
+from entendimento import entender
 
 LISTA = "https://www1.dnit.gov.br/editais/consulta/lista.asp"
 RESUMO = "https://www1.dnit.gov.br/editais/consulta/resumoEdital.asp?NUMIDEdital="
@@ -75,6 +76,7 @@ def main():
         servicos = [nome for nome, rx, _ in t.SERVICOS_LM if rx.search(h.norm(objeto))]
         motivo = "Órgão prioritário (DNIT)" + (": " + ", ".join(servicos) if servicos else ": obra/serviço rodoviário")
         triagem = {"motivo": motivo, "prioridade": "alta", "fonte": "DNIT", "linkDnit": link}
+        valor_lista = None
         # já está no controle (veio pelo PNCP ou de uma rodada anterior)?
         ja = None
         for l in existentes:
@@ -104,7 +106,7 @@ def main():
             "numero": numero, "modalidade": e["modalidade"], "objeto": objeto, "valor": r["valor"],
             "linkPortal": link, "interesse": None, "status": "", "servicos": [], "atestados": "", "observacao": "",
             "garantiaProposta": "", "vencedora": "", "camposEditados": [], "lote": agora, "criadoEm": agora, "atualizadoEm": agora,
-            "triagem": dict(triagem, plataforma=r["local"]), "suspensa": bool(situacao),
+            "triagem": dict(triagem, plataforma=r["local"], obra=entender(objeto, r["valor"])["resumo"]), "suspensa": bool(situacao),
         }
         print(f"INCLUÍDA: DNIT {e['numero']} | {r['data']} | R$ {r['valor']} | {objeto[:80]}")
         t.gravar("licitacoes", f"dnit_{idn}", reg)

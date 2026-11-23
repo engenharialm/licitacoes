@@ -2949,7 +2949,7 @@ function objetoBadges(l) {
   if (prioridadeDe(l) === "alta") b.push(`<span class="badge prio-alta" title="Pavimentação, recapeamento, recuperação asfáltica, subleito ou base/sub-base">PRIORIDADE ALTA</span>`);
   if (l.triagem?.anexos === "inacessiveis") b.push(`<span class="badge warn" title="Os anexos não puderam ser lidos (sem PDF, compactado ou digitalizado) — a licitação não foi descartada">anexos não lidos — conferir</span>`);
   const motivo = motivoInclusao(l), plat = plataformaDe(l);
-  const extra = [motivo ? `<b>Motivo:</b> ${escapeHtml(motivo)}` : "", plat ? `<b>Plataforma:</b> ${escapeHtml(plat)}` : "",
+  const extra = [l.triagem?.obra ? `<b>Obra:</b> ${escapeHtml(l.triagem.obra)}` : "", motivo ? `<b>Motivo:</b> ${escapeHtml(motivo)}` : "", plat ? `<b>Plataforma:</b> ${escapeHtml(plat)}` : "",
     p.situacao && !/divulgada/i.test(p.situacao) ? `<b>Situação:</b> ${escapeHtml(p.situacao)}` : ""].filter(Boolean);
   // o tipo confirmado no edital vale mais que a leitura do objeto
   if (l.tipoPavimentoEdital === "misto") b.push(`<span class="badge warn">asfalto + calçamento</span>`);

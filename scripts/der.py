@@ -15,6 +15,7 @@ from datetime import datetime, timedelta, timezone
 
 import horario_disputa as h
 import triagem_documentos as t
+from entendimento import entender
 from dnit import RX_FORA, RX_RODOVIARIO
 
 BASE = "https://www.der.mg.gov.br"
@@ -101,7 +102,7 @@ def main():
         if ja:
             print(f"já no controle: {numero} ({ja['id']})")
             if "--teste" not in sys.argv:
-                upd = {"triagem": dict(ja.get("triagem") or {}, **triagem)}
+                upd = {"triagem": dict(ja.get("triagem") or {}, **triagem, obra=entender(objeto, d["valor"])["resumo"])}
                 corpo = json.dumps({"fields": {k: t.campo(v) for k, v in upd.items()}}).encode()
                 h.http(f"{h.DOCS}/licitacoes/{ja['id']}?key={h.CHAVE}&updateMask.fieldPaths=triagem", "PATCH", corpo)
             continue
@@ -111,7 +112,7 @@ def main():
             "cidade": "Belo Horizonte (sede do órgão)", "numero": numero, "modalidade": d["modalidade"], "objeto": objeto,
             "valor": d["valor"], "linkPortal": it["link"], "interesse": None, "status": "", "servicos": [], "atestados": "",
             "observacao": "", "garantiaProposta": "", "vencedora": "", "camposEditados": [], "lote": agora, "criadoEm": agora,
-            "atualizadoEm": agora, "triagem": triagem, "suspensa": d["suspensa"],
+            "atualizadoEm": agora, "triagem": dict(triagem, obra=entender(objeto, d["valor"])["resumo"]), "suspensa": d["suspensa"],
         }
         print(f"INCLUÍDA: {numero} | {d['data']} | R$ {d['valor']} | {objeto[:80]}")
         t.gravar("licitacoes", f"der_{it['id']}", reg)
