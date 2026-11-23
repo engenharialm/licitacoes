@@ -8,6 +8,7 @@ import re
 import horario_disputa as h
 
 TIPOS = [   # (nome, regex, perfil) — a primeira que bater define o tipo
+    ("Fornecimento de massa asfáltica / material", r"^(.{0,80})(fornecimento|aquisicao|compra)\b.{0,60}(cbuq|massa asfaltica|concreto (betuminoso|asfaltico)|\bpmf\b|pre-?misturado|emulsao|\bcap\b|cimento asfaltico)", "sim"),
     ("Pavimentação asfáltica", r"pavimentacao asfaltica|\bcbuq\b|\bcauq\b|concreto (betuminoso|asfaltico)|asfaltamento", "sim"),
     ("Recapeamento / fresagem", r"recapeamento|fresagem", "sim"),
     ("Restauração / recuperação de pavimento", r"(restaura|recupera|reforc)\w* (estrutural )?(d[aeo]s? |de )?pavimen", "sim"),
@@ -34,6 +35,8 @@ def entender(objeto, valor=None, texto_docs=""):
     n = h.norm(objeto)
     tipo, perfil = "Obra a identificar", "conferir"
     for nome, rx, p in TIPOS:
+        if nome.startswith("Fornecimento") and re.search(r"execu|pavimentacao|servicos? de|\bobras?\b|recapeamento", n):
+            continue   # obra com fornecimento de material é obra, não compra de material
         if re.search(rx, n):
             tipo, perfil = nome, p
             break

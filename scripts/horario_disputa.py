@@ -91,7 +91,7 @@ def licitacoes():
             return
 
 
-def texto_do_edital(link):
+def texto_do_edital(link, paginas=15):
     m = re.search(r"editais/(\d+)/(\d+)/(\d+)", link or "")
     if not m:
         return None
@@ -106,7 +106,7 @@ def texto_do_edital(link):
             break
         try:
             leitor = PdfReader(io.BytesIO(http(a["url"])))
-            return "\n".join((p.extract_text() or "") for p in leitor.pages[:15])
+            return "\n".join((p.extract_text() or "") for p in leitor.pages[:paginas])
         except Exception:
             continue
     return None
@@ -160,11 +160,11 @@ def main():
         enc = p.get("dataEncerramento") or ""
         if l.get("origem") != "PNCP" or not enc or enc[:16] < agora or l.get("naListaPncp") is False:
             continue
-        if (l.get("disputaEdital") or {}).get("encerramento") == enc:
+        if (l.get("disputaEdital") or {}).get("encerramento") == enc and l.get("dadosEdital"):
             continue   # já lido com esta data do PNCP
         lidas += 1
         try:
-            texto = texto_do_edital(p.get("linkPncp"))
+            texto = texto_do_edital(p.get("linkPncp"), 80)
         except Exception as e:
             print(f"falha ao ler edital {doc_id}: {e}")
             continue
@@ -175,6 +175,12 @@ def main():
         # o horário da disputa vira a data da sessão, salvo se a equipe ajustou à mão
         if sessao and "dataSessao" not in (l.get("camposEditados") or []):
             dados["dataSessao"] = sessao
+        import edital_dados
+        extra = edital_dados.extrair(texto or "")
+        if extra:
+            dados["dadosEdital"] = extra
+            if extra["garantia"] != edital_dados.NI and not (l.get("garantiaProposta") or "").strip():
+                dados["garantiaProposta"] = extra["garantia"]
         achadas += bool(sessao)
         gravar(doc_id, dados)
         print(f"{'OK ' + sessao if sessao else 'a conferir'}: {l.get('orgao')} — {l.get('numero')}")

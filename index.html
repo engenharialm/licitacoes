@@ -213,6 +213,8 @@
   .card .value.suspensa{color:#D4A000;}
   .badge.prio-alta{background:#0B83B2;color:#fff;font-weight:700;}
   .motivo-lm{margin-top:4px;line-height:1.35;}
+  .badge.acima500{background:#E0F2FE;color:#075985;border:1px solid #7DD3FC;}
+  .badge.prazo5{background:#FEE2E2;color:#991B1B;border:1px solid #F87171;font-weight:700;}
   .card .value.decidir{color:#00B300;}
   .badge.suspensa{background:#FFFF00;color:#1F2937;font-weight:800;}
   .susp-chk{display:inline-flex;align-items:center;gap:4px;margin-top:4px;font-size:.66rem;font-weight:600;color:var(--text-dim);cursor:pointer;white-space:nowrap;}
@@ -1938,7 +1940,12 @@ function classificar(objeto, orgao) {
   if (RX.calc.test(n) && !asfalto) return null;
   // gerenciamento, supervisão, consultoria e projetos ficam de fora
   if (RX.tec.test(n) && !/integrada/.test(n)) return null;
-  if (ehAquisicaoMaterial(objeto)) return null;
+  if (ehAquisicaoMaterial(objeto)) {
+    // fornecimento de massa asfáltica / material de pavimento também interessa (usina), com prioridade normal
+    if (!/cbuq|massa asfaltica|concreto (betuminoso|asfaltico)|\bpmf\b|pre-?\s?misturado|emulsao|\bcap\b|cimento asfaltico|asfalt/.test(n)) return null;
+    return { pav: true, ter: false, dre: false, asfalto: true, chave: n.replace(/^\s*\[[^\]]*\]\s*-?\s*/, "").replace(/[^a-z0-9]/g, ""),
+      motivo: "Fornecimento de material asfáltico (CBUQ / PMF / emulsão / CAP)", prioridade: "normal" };
+  }
   const chave = n.replace(/^\s*\[[^\]]*\]\s*-?\s*/, "").replace(/[^a-z0-9]/g, "");
   const nomes = servicos.map(s => s.nome);
   if (!nomes.length) nomes.push(pavExtra ? "Infraestrutura / obra viária" : "Pavimentação");
@@ -2734,7 +2741,12 @@ async function gerarCard(id) {
     <div class="fato dest"><span>Sessão</span><b>${e(fmtDateTime(l.dataSessao) || "—")}</b></div>
     <div class="fato dest"><span>Valor estimado</span><b>${e((fmtMoney(l.valor) || "—").replace(/ /g, " "))}</b></div>
     ${p?.dataEncerramento && fmtDateTime(p.dataEncerramento) !== fmtDateTime(l.dataSessao) ? fato("Prazo de propostas", fmtDateTime(p.dataEncerramento)) : fato("Modalidade", modalidade)}
-    ${fato("Garantia de proposta", l.garantiaProposta)}
+    ${fato("Garantia de proposta", l.garantiaProposta || l.dadosEdital?.garantia)}
+    ${l.dadosEdital ? fato("Prazo p/ impugnação", l.dadosEdital.impugnacao) : ""}
+    ${l.dadosEdital ? fato("Modo de disputa", l.dadosEdital.modoDisputa) : ""}
+    ${l.dadosEdital ? fato("Usina de asfalto", l.dadosEdital.usina) : ""}
+    ${l.dadosEdital ? fato("Atestado (quantitativos)", l.dadosEdital.atestado) : ""}
+    ${l.triagem?.obra ? fato("Obra", l.triagem.obra) : ""}
     ${fato("Região de interesse", reg ? (reg.dentro ? "Dentro" : "Fora") + ` (${reg.km} km de ${reg.base})` : "")}
     ${fato("Nº da licitação", l.numero)}
   </div>
@@ -2943,11 +2955,28 @@ function plataformaDe(l) {
   try { return url ? new URL(url).hostname.replace(/^www\./, "") : ""; } catch { return ""; }
 }
 function motivoInclusao(l) { return l.triagem?.motivo || fonte(l).motivo || ""; }
-function prioridadeDe(l) { return l.triagem?.prioridade || fonte(l).prioridade || ""; }
+// cidades prioritárias da LM: entram com prioridade alta e destaque no card
+const CIDADES_PRIORITARIAS = ["teofilo otoni", "sete lagoas", "tapira", "felixlandia", "sao jose do buriti", "januaria", "mirabela",
+  "santa margarida", "contagem", "conselheiro lafaiete", "lavras", "carlos chagas"];
+function cidadePrioritaria(l) {
+  const t = norm((l.cidade || "") + " " + (l.orgao || "")).replace(/[^a-z ]/g, " ");
+  return CIDADES_PRIORITARIAS.find(c => (" " + t.replace(/\s+/g, " ") + " ").includes(" " + c + " ")) || "";
+}
+function prioridadeDe(l) { return cidadePrioritaria(l) ? "alta" : (l.triagem?.prioridade || fonte(l).prioridade || ""); }
+function diasParaSessao(l) {
+  if (!l.dataSessao) return null;
+  const d = (new Date(l.dataSessao.slice(0, 10) + "T00:00:00") - new Date(localIso(new Date()).slice(0, 10) + "T00:00:00")) / 864e5;
+  return Math.round(d);
+}
 function objetoBadges(l) {
   const p = fonte(l);
   const b = [];
-  if (prioridadeDe(l) === "alta") b.push(`<span class="badge prio-alta" title="Pavimentação, recapeamento, recuperação asfáltica, subleito ou base/sub-base">PRIORIDADE ALTA</span>`);
+  const cp = cidadePrioritaria(l);
+  if (cp) b.push(`<span class="badge prio-alta" title="Cidade prioritária da LM">CIDADE PRIORITÁRIA</span>`);
+  if ((l.valor || 0) > 500000) b.push(`<span class="badge acima500" title="Valor estimado acima de R$ 500 mil">acima de R$ 500 mil</span>`);
+  const dd = diasParaSessao(l);
+  if (dd !== null && dd >= 0 && dd <= 5 && isAtiva(l)) b.push(`<span class="badge prazo5" title="Sessão nos próximos 5 dias">${dd === 0 ? "SESSÃO HOJE" : dd === 1 ? "SESSÃO AMANHÃ" : `sessão em ${dd} dias`}</span>`);
+  if (prioridadeDe(l) === "alta" && !cp) b.push(`<span class="badge prio-alta" title="Pavimentação, recapeamento, recuperação asfáltica, subleito ou base/sub-base">PRIORIDADE ALTA</span>`);
   if (l.triagem?.anexos === "inacessiveis") b.push(`<span class="badge warn" title="Os anexos não puderam ser lidos (sem PDF, compactado ou digitalizado) — a licitação não foi descartada">anexos não lidos — conferir</span>`);
   const motivo = motivoInclusao(l), plat = plataformaDe(l);
   const extra = [l.triagem?.obra ? `<b>Obra:</b> ${escapeHtml(l.triagem.obra)}` : "", motivo ? `<b>Motivo:</b> ${escapeHtml(motivo)}` : "", plat ? `<b>Plataforma:</b> ${escapeHtml(plat)}` : "",
