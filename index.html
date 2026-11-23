@@ -3562,7 +3562,7 @@ async function atualizarDnit() {
   const fechar = document.getElementById("pncp-fechar"), resumo = document.getElementById("pncp-resumo");
   logEl.textContent = ""; resumo.textContent = ""; bar.style.width = "0"; fechar.disabled = true;
   document.getElementById("pncp-titulo").textContent = "Atualizando do DNIT";
-  document.getElementById("pncp-nota").textContent = "Lemos a consulta oficial de editais do DNIT e incluímos as obras e serviços rodoviários da Superintendência de Minas Gerais com prioridade alta. O que já veio pelo PNCP não é duplicado.";
+  document.getElementById("pncp-nota").textContent = "Lemos a consulta oficial de editais do DNIT e incluímos as obras e serviços Todos os processos abertos da Superintendência de Minas Gerais entram; obras e serviços rodoviários com prioridade alta. O que já veio pelo PNCP não é duplicado.";
   modal.classList.add("open");
   const log = msg => { logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; };
   try {
@@ -3572,7 +3572,7 @@ async function atualizarDnit() {
     const mg = lista.filter(e => /MINAS/i.test(e.regional || "") && ["EDITAL ATIVO", "EDITAL SUSPENSO"].includes(e.status)).filter(e => {
       const [d, m, a] = (e.data_abertura || "00/00/0000").split("/");
       const n = norm(e.objeto);
-      return `${a}-${m}-${d}` >= hoje && RX_DNIT_ROD.test(n) && !RX_DNIT_FORA.test(n);
+      return `${a}-${m}-${d}` >= hoje;   // todos os processos abertos da Superintendência de MG
     });
     log(`${lista.length} editais no DNIT; ${mg.length} obras/serviços rodoviários abertos em MG.`);
     const lote = new Date().toISOString(), entries = [];
@@ -3583,7 +3583,9 @@ async function atualizarDnit() {
       const idn = String(e.detalhes), id = "dnit_" + idn, link = DNIT_RESUMO + idn;
       const objeto = (e.objeto || "").replace(/\s+/g, " ").trim();
       const nomes = servicosLm(norm(objeto)).map(s => s.nome);
-      const triagem = { motivo: "Órgão prioritário (DNIT)" + (nomes.length ? ": " + nomes.join(", ") : ": obra/serviço rodoviário"), prioridade: "alta", fonte: "DNIT", linkDnit: link };
+      const rod = RX_DNIT_ROD.test(norm(objeto)) && !RX_DNIT_FORA.test(norm(objeto));
+      const triagem = rod ? { motivo: "Órgão prioritário (DNIT)" + (nomes.length ? ": " + nomes.join(", ") : ": obra/serviço rodoviário"), prioridade: "alta", fonte: "DNIT", linkDnit: link }
+        : { motivo: "Processo publicado no site do DNIT (Superintendência MG)", prioridade: "normal", fonte: "DNIT", linkDnit: link };
       const suspensa = e.status === "EDITAL SUSPENSO";
       const atual = licitacoes.find(l => l.id === id || (/dnit|infraest/.test(norm(l.orgao)) && new RegExp(`^0*${seq}/${ano}$`).test((l.numero || "").split("—")[0].trim()))) || jaNoControle({ objeto, orgao: "DNIT", cidade: "Belo Horizonte", numero: `${seq}/${ano}` });
       if (atual) {
@@ -3632,7 +3634,7 @@ async function atualizarDer() {
   const fechar = document.getElementById("pncp-fechar"), resumo = document.getElementById("pncp-resumo");
   logEl.textContent = ""; resumo.textContent = ""; bar.style.width = "0"; fechar.disabled = true;
   document.getElementById("pncp-titulo").textContent = "Atualizando do DER-MG";
-  document.getElementById("pncp-nota").textContent = "Concorrências do site do DER-MG (der.mg.gov.br). A página é lida pelo robô às 06:30, 12:30 e 18:00; aqui entram no controle as obras e serviços rodoviários abertos, com prioridade alta. Supervisão, projetos e consultoria ficam de fora.";
+  document.getElementById("pncp-nota").textContent = "Concorrências do site do DER-MG (der.mg.gov.br). A página é lida pelo robô às 06:30, 12:30 e 18:00; aqui entram no controle todos os processos abertos (concorrências e pregões); obras e serviços rodoviários com prioridade alta.";
   modal.classList.add("open");
   const log = msg => { logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; };
   try {
@@ -3646,11 +3648,13 @@ async function atualizarDer() {
     const lote = new Date().toISOString(), entries = [];
     let novos = 0, ja = 0, fora = 0;
     for (const e of abertas) {
-      if (!e.interessa) { fora++; log(`fora do perfil: ${e.numero} — ${e.objeto.slice(0, 80)}`); continue; }
+
       const id = "der_" + e.id;
       const [, seq, ano] = (e.numero || "").match(/0*(\d+)\/(\d{4})/) || [];
       const nomes = servicosLm(norm(e.objeto)).map(s => s.nome);
-      const triagem = { motivo: "Órgão prioritário (DER-MG)" + (nomes.length ? ": " + nomes.join(", ") : ": obra/serviço rodoviário"), prioridade: "alta", fonte: "DER-MG", linkDer: e.link };
+      if (!e.interessa) fora++;
+      const triagem = e.interessa ? { motivo: "Órgão prioritário (DER-MG)" + (nomes.length ? ": " + nomes.join(", ") : ": obra/serviço rodoviário"), prioridade: "alta", fonte: "DER-MG", linkDer: e.link }
+        : { motivo: "Processo publicado no site do DER-MG", prioridade: "normal", fonte: "DER-MG", linkDer: e.link };
       const atual = licitacoes.find(l => l.id === id || (seq && /estradas de rodagem|\bder\b|\bdeer\b/.test(norm(l.orgao)) && new RegExp(`\b0*${seq}/${ano}\b`).test(l.numero || ""))) || jaNoControle({ objeto: e.objeto, orgao: "DER-MG estradas de rodagem", cidade: "Belo Horizonte", numero: e.numero, data: e.data });
       if (atual) { ja++; entries.push({ id: atual.id, data: { triagem: { ...(atual.triagem || {}), ...triagem }, atualizadoEm: lote } }); continue; }
       novos++;
@@ -3667,7 +3671,7 @@ async function atualizarDer() {
     licitacoes = await store.loadAll();
     renderAll();
     etapa.textContent = "Concluído.";
-    resumo.textContent = `${abertas.length} abertas no DER-MG · ${novos} novas · ${ja} já no controle · ${fora} fora do perfil`;
+    resumo.textContent = `${abertas.length} abertas no DER-MG · ${novos} novas · ${ja} já no controle · ${fora} não rodoviários (prioridade normal)`;
   } catch (e) {
     console.error(e);
     etapa.textContent = "Erro na atualização.";

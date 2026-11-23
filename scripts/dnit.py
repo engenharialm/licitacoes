@@ -61,10 +61,8 @@ def main():
         d, m, a = (e.get("data_abertura") or "00/00/0000").split("/")
         if f"{a}-{m}-{d}" < hoje:
             continue
-        n = h.norm(e.get("objeto") or "")
-        if RX_RODOVIARIO.search(n) and not RX_FORA.search(n):
-            mg.append(e)
-    print(f"{len(lista)} editais no DNIT; {len(mg)} obras/serviços rodoviários abertos em MG")
+        mg.append(e)   # todos os processos abertos da Superintendência de MG
+    print(f"{len(lista)} editais no DNIT; {len(mg)} processos abertos da Superintendência de MG")
 
     existentes = [dict(f, id=i) for i, f in h.licitacoes()]
     novas = 0
@@ -74,8 +72,12 @@ def main():
         link = RESUMO + idn
         objeto = " ".join((e.get("objeto") or "").split())
         servicos = [nome for nome, rx, _ in t.SERVICOS_LM if rx.search(h.norm(objeto))]
-        motivo = "Órgão prioritário (DNIT)" + (": " + ", ".join(servicos) if servicos else ": obra/serviço rodoviário")
-        triagem = {"motivo": motivo, "prioridade": "alta", "fonte": "DNIT", "linkDnit": link}
+        n = h.norm(objeto)
+        if RX_RODOVIARIO.search(n) and not RX_FORA.search(n):
+            motivo, prio = "Órgão prioritário (DNIT)" + (": " + ", ".join(servicos) if servicos else ": obra/serviço rodoviário"), "alta"
+        else:
+            motivo, prio = "Processo publicado no site do DNIT (Superintendência MG)", "normal"
+        triagem = {"motivo": motivo, "prioridade": prio, "fonte": "DNIT", "linkDnit": link}
         valor_lista = None
         # já está no controle (veio pelo PNCP ou de uma rodada anterior)?
         ja = None

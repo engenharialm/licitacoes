@@ -31,16 +31,18 @@ def texto(s):
     return " ".join(html.unescape(re.sub(r"<[^>]+>", " ", s)).split())
 
 
-def lista(ano):
-    s = baixar(f"{BASE}/transparencia/licitacoes/concorrencias-{ano}")
-    itens = []
-    for m in re.finditer(r'<a [^>]*href="(/transparencia/licitacoes/concorrencias-\d{4}/[^"]*?(\d+)-edital-[^"]+)"[^>]*>(.*?)</a>(.*?)(?=<a [^>]*href="/transparencia/licitacoes/concorrencias-\d{4}/[^"]*-edital-|</table>|$)',
-                         s, re.S):
-        link, nid, rotulo, resto = m.groups()
+def lista(pagina):
+    """Processos listados numa página do DER (concorrencias-AAAA ou pregoes), na ordem do site (mais recentes primeiro)."""
+    s = baixar(f"{BASE}/transparencia/licitacoes/{pagina}")
+    itens, vistos = [], set()
+    for m in re.finditer(r'<a [^>]*href="(/transparencia/licitacoes/(?:concorrencias-\d{4}|pregoes)/(?:[^"]*?/)?(\d+)-[^"]+)"[^>]*>(.*?)</a>', s, re.S):
+        link, nid, rotulo = m.groups()
+        if nid in vistos or "portaria" in link:
+            continue
+        vistos.add(nid)
         rot = texto(rotulo)
-        num = re.search(r"(\d{7})\s*0*(\d+)/(\d{4})", rot + " " + texto(resto)[:60])
-        itens.append({"id": nid, "link": BASE + link, "rotulo": rot, "num": num.groups() if num else None,
-                      "resumo": texto(resto)[:1200]})
+        num = re.search(r"(\d{6,7})\s*0*(\d+)/(\d{4})", rot) or re.search(r"(\d{6,7})-0*(\d+)-(\d{4})", link)
+        itens.append({"id": nid, "link": BASE + link, "rotulo": rot, "num": num.groups() if num else None, "resumo": rot})
     return itens
 
 
@@ -66,13 +68,13 @@ def interessa(objeto):
 def main():
     agora_br = datetime.now(timezone(timedelta(hours=-3)))
     hoje = agora_br.strftime("%Y-%m-%d")
-    itens = lista(agora_br.year)
+    itens = lista(f"concorrencias-{agora_br.year}")[:60] + lista("pregoes?limit=30")
     if agora_br.month == 1:
-        itens += lista(agora_br.year - 1)
-    print(f"{len(itens)} concorrências na página do DER-MG")
+        itens += lista(f"concorrencias-{agora_br.year - 1}")[:20]
+    print(f"{len(itens)} processos lidos no site do DER-MG (concorrências e pregões)")
     existentes = [dict(f, id=i) for i, f in h.licitacoes()]
     abertas, novas = [], 0
-    for it in itens[:60]:   # as mais recentes ficam no topo
+    for it in itens:
         try:
             d = detalhe(it["link"])
         except Exception as e:
@@ -86,12 +88,13 @@ def main():
         reg_fonte = {"id": it["id"], "link": it["link"], "numero": numero, "objeto": objeto, "valor": d["valor"],
                      "data": d["data"], "modalidade": d["modalidade"], "interessa": interessa(objeto), "suspensa": d["suspensa"]}
         abertas.append(reg_fonte)
-        if not reg_fonte["interessa"]:
-            print(f"fora do perfil: {numero} — {objeto[:80]}")
-            continue
+        # todos os processos do DER entram; obra/serviço rodoviário com prioridade alta, os demais com prioridade normal
         nomes = [nome for nome, rx, _ in t.SERVICOS_LM if rx.search(h.norm(objeto))]
-        triagem = {"motivo": "Órgão prioritário (DER-MG)" + (": " + ", ".join(nomes) if nomes else ": obra/serviço rodoviário"),
-                   "prioridade": "alta", "fonte": "DER-MG", "linkDer": it["link"]}
+        if reg_fonte["interessa"]:
+            motivo, prio = "Órgão prioritário (DER-MG)" + (": " + ", ".join(nomes) if nomes else ": obra/serviço rodoviário"), "alta"
+        else:
+            motivo, prio = "Processo publicado no site do DER-MG", "normal"
+        triagem = {"motivo": motivo, "prioridade": prio, "fonte": "DER-MG", "linkDer": it["link"]}
         ja = None
         for l in existentes:
             org = h.norm(l.get("orgao") or "")
@@ -118,7 +121,7 @@ def main():
         t.gravar("licitacoes", f"der_{it['id']}", reg)
         novas += 1
     t.gravar("fontes", "der", {"em": datetime.now(timezone.utc).isoformat(), "abertas": abertas})
-    print(f"{len(abertas)} abertas no DER-MG; {novas} novas incluídas")
+    print(f"{len(abertas)} abertos no DER-MG; {novas} novos incluídos")
 
 
 if __name__ == "__main__":
