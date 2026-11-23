@@ -65,11 +65,19 @@ RX_OBRA = re.compile(r"\bobras?\b|execu|constru|reforma|recupera|melhori|manuten
 SERVICOS_DOC = [s for s in SERVICOS_LM if s[2]]
 
 
+RX_EXECUCAO = re.compile(r"execucao (de|dos|das) (obras?|servicos)|servicos? de engenharia|empresa de engenharia")
+
+
+def excluido(n):
+    """Ferramentas, veículos etc. só excluem compra/locação; em execução de obra são o que a contratada fornece."""
+    return bool(RX_EXCLUIR.search(n)) and not RX_EXECUCAO.search(n[:200])
+
+
 def objeto_aceito_pelo_site(n):
     """Aproximação do classificar() do site: se o objeto já basta, o botão Atualizar do PNCP inclui."""
     servicos = [s for s in SERVICOS_LM if s[1].search(n) and (s[2] or not RX_PREDIO.search(n))]
     pav = RX_PAV.search(n) or (RX_VIARIO.search(n) and not RX_PREDIO.search(n)) or servicos
-    return bool(pav) and not RX_EXCLUIR.search(n) and not (RX_TEC.search(n) and "integrada" not in n)
+    return bool(pav) and not excluido(n) and not (RX_TEC.search(n) and "integrada" not in n)
 
 
 def eh_aquisicao_material(n):
@@ -79,7 +87,7 @@ def eh_aquisicao_material(n):
 
 def candidata(objeto):
     n = h.norm(objeto)
-    if objeto_aceito_pelo_site(n) or eh_aquisicao_material(n) or RX_EXCLUIR.search(n):
+    if objeto_aceito_pelo_site(n) or eh_aquisicao_material(n) or excluido(n):
         return False
     if RX_TEC.search(n) and "integrada" not in n:
         return False

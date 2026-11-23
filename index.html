@@ -1936,7 +1936,8 @@ function classificar(objeto, orgao) {
   const asfalto = RX.asf.test(n);
   // só pavimentação asfáltica; drenagem e terraplenagem entram apenas junto com pavimentação
   if (!pav) return null;
-  if (RX.excluir.test(n)) return null;
+  // "ferramentas", "veículos" etc. só excluem compra/locação; em execução de obra são só o que a contratada fornece
+  if (RX.excluir.test(n) && !/execucao (de|dos|das) (obras?|servicos)|servicos? de engenharia|empresa de engenharia/.test(n.slice(0, 200))) return null;
   if (RX.calc.test(n) && !asfalto) return null;
   // gerenciamento, supervisão, consultoria e projetos ficam de fora
   if (RX.tec.test(n) && !/integrada/.test(n)) return null;

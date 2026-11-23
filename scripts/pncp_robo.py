@@ -19,7 +19,7 @@ RX_ORGAO = re.compile(r"departamento nacional de infra|\bdnit\b|estradas de roda
 
 def classificar(objeto, orgao):
     n = h.norm(objeto)
-    if t.RX_EXCLUIR.search(n):
+    if t.excluido(n):
         return None
     if t.eh_aquisicao_material(n):
         # fornecimento de massa asfáltica / material de pavimento: interessa (usina), prioridade normal
