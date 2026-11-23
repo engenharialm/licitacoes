@@ -794,6 +794,7 @@
       <button class="btn btn-ghost" id="btn-add">+ Nova licitação</button>
       <button class="btn btn-accent" id="btn-pncp">⟳ Atualizar do PNCP</button>
       <button class="btn btn-accent" id="btn-alerta" title="Busca no Alerta Licitação (pede a chave da API na primeira vez)">⟳ Atualizar do Alerta</button>
+      <button class="btn btn-accent" id="btn-dnit" title="Busca na consulta oficial de editais do DNIT (Superintendência de MG)">⟳ Atualizar DNIT</button>
     </div>
   </header>
 
@@ -3479,6 +3480,95 @@ function similaridade(a, b) {
 }
 function municipioChave(s) { return norm(s).replace(/\(.*?\)/g, "").replace(/[^a-z]/g, ""); }
 
+// ===== DNIT: consulta oficial de editais (a mesma lista de gov.br/dnit/.../editais-de-licitacoes) =====
+// Mesmas regras do robô scripts/dnit.py: Superintendência de MG, obra/serviço rodoviário, prioridade alta.
+const DNIT_LISTA = "https://www1.dnit.gov.br/editais/consulta/lista.asp";
+const DNIT_RESUMO = "https://www1.dnit.gov.br/editais/consulta/resumoEdital.asp?NUMIDEdital=";
+const RX_DNIT_ROD = /rodovi|\bbr\s*-?\s*\d{3}|estradas?|pavimen|asfalt|conserva\w* rodovi|manutencao rodovi|restaura|recupera|sinaliza|drenagem|\bpontes?\b|viadut|obras?\b|duplica|implanta|acostamento|contorno|travessia|faixa de dominio|rocada|recomposi|eliminacao de pontos criticos|obras? de artes?/;
+const RX_DNIT_FORA = /limpeza e conserva|limpeza, conserva|\bseguro\b|vigilancia|veiculos?|frota|ar condicionado|manutencao predial|predio|edificio|sede|copeiragem|recepcao|telefon|informatica|software|\b(consultoria|gerenciamento|supervisao|fiscalizacao)\b|elaboracao d[oe]s? (estudos|projetos?|anteprojeto)|\bestudos\b|projetos? basico|projeto executivo|levantamento|topograf|aquisicao|locacao|balanca|pesagem|radar|controle de velocidade|apoio tecnico|desapropria|ambiental/;
+async function textoLatin1(url) {
+  const r = await fetch(url, { cache: "no-store" });
+  if (!r.ok) throw new Error("DNIT respondeu " + r.status);
+  return new TextDecoder("iso-8859-1").decode(await r.arrayBuffer());
+}
+async function resumoDnit(idn) {
+  const d = new DOMParser().parseFromString(await textoLatin1(DNIT_RESUMO + idn), "text/html");
+  const txt = (d.body.innerText || d.body.textContent || "").replace(/​/g, "").replace(/\s+/g, " ");
+  const v = txt.match(/Valor Global \(R\$\)\s*([\d.]+,\d{2})/), dh = txt.match(/Data\/Hora\s*(\d{2})\/(\d{2})\/(\d{4})\D{0,8}?(\d{1,2}):(\d{2})/);
+  const g = rx => (txt.match(rx) || [])[1] || "";
+  return {
+    valor: v ? Number(v[1].replace(/\./g, "").replace(",", ".")) : null,
+    data: dh ? `${dh[3]}-${dh[2]}-${dh[1]}T${dh[4].padStart(2, "0")}:${dh[5]}:00` : "",
+    local: g(/Local \/ Data Local\s*(\S+)/), sape: g(/Edital SAPE\s*(\S+)/), processo: g(/Processo\s*([\d./-]+)/)
+  };
+}
+async function atualizarDnit() {
+  if (!requireUnlock()) return;
+  const modal = document.getElementById("modal-pncp"), etapa = document.getElementById("pncp-etapa");
+  const bar = document.getElementById("pncp-bar"), logEl = document.getElementById("pncp-log");
+  const fechar = document.getElementById("pncp-fechar"), resumo = document.getElementById("pncp-resumo");
+  logEl.textContent = ""; resumo.textContent = ""; bar.style.width = "0"; fechar.disabled = true;
+  document.getElementById("pncp-titulo").textContent = "Atualizando do DNIT";
+  document.getElementById("pncp-nota").textContent = "Lemos a consulta oficial de editais do DNIT e incluímos as obras e serviços rodoviários da Superintendência de Minas Gerais com prioridade alta. O que já veio pelo PNCP não é duplicado.";
+  modal.classList.add("open");
+  const log = msg => { logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; };
+  try {
+    etapa.textContent = "Lendo a lista de editais do DNIT...";
+    const lista = JSON.parse(await textoLatin1(DNIT_LISTA + "?_=" + Date.now())).aaData || [];
+    const hoje = localIso(new Date()).slice(0, 10);
+    const mg = lista.filter(e => /MINAS/i.test(e.regional || "") && ["EDITAL ATIVO", "EDITAL SUSPENSO"].includes(e.status)).filter(e => {
+      const [d, m, a] = (e.data_abertura || "00/00/0000").split("/");
+      const n = norm(e.objeto);
+      return `${a}-${m}-${d}` >= hoje && RX_DNIT_ROD.test(n) && !RX_DNIT_FORA.test(n);
+    });
+    log(`${lista.length} editais no DNIT; ${mg.length} obras/serviços rodoviários abertos em MG.`);
+    const lote = new Date().toISOString(), entries = [];
+    let novos = 0, ja = 0;
+    for (const [i, e] of mg.entries()) {
+      bar.style.width = `${Math.round(i / Math.max(mg.length, 1) * 100)}%`;
+      const [, seq, ano] = e.numero.match(/\d+-0*(\d+)\/(\d{4})/) || [];
+      const idn = String(e.detalhes), id = "dnit_" + idn, link = DNIT_RESUMO + idn;
+      const objeto = (e.objeto || "").replace(/\s+/g, " ").trim();
+      const nomes = servicosLm(norm(objeto)).map(s => s.nome);
+      const triagem = { motivo: "Órgão prioritário (DNIT)" + (nomes.length ? ": " + nomes.join(", ") : ": obra/serviço rodoviário"), prioridade: "alta", fonte: "DNIT", linkDnit: link };
+      const suspensa = e.status === "EDITAL SUSPENSO";
+      const atual = licitacoes.find(l => l.id === id || (/dnit|infraest/.test(norm(l.orgao)) && new RegExp(`^0*${seq}/${ano}$`).test((l.numero || "").split("—")[0].trim())));
+      if (atual) {
+        ja++;
+        entries.push({ id: atual.id, data: { triagem: { ...(atual.triagem || {}), ...triagem }, ...(suspensa ? { suspensa: true } : {}), atualizadoEm: lote } });
+        log(`já no controle: ${e.numero}`);
+        continue;
+      }
+      etapa.textContent = `Lendo o edital ${e.numero}...`;
+      const r = await resumoDnit(idn);
+      const [d, m, a] = e.data_abertura.split("/");
+      novos++;
+      entries.push({ id, data: {
+        origem: "DNIT", dataSessao: r.data || `${a}-${m}-${d}T00:00:00`, orgao: "DNIT — Superintendência Regional em Minas Gerais",
+        cidade: "Belo Horizonte (sede do órgão)",
+        numero: `${e.modalidade} ${Number(seq)}/${ano}` + (r.sape ? ` — Edital SAPE ${r.sape}` : "") + (r.processo ? ` — Proc. ${r.processo}` : ""),
+        modalidade: e.modalidade, objeto, valor: r.valor, linkPortal: link, interesse: null, status: "", servicos: [], atestados: "",
+        observacao: "", garantiaProposta: "", vencedora: "", camposEditados: [], lote, criadoEm: lote, atualizadoEm: lote,
+        triagem: { ...triagem, plataforma: r.local }, suspensa
+      }});
+      log(`NOVA: ${e.numero} — ${objeto.slice(0, 90)}`);
+    }
+    bar.style.width = "100%";
+    if (entries.length) await store.saveMany(entries);
+    licitacoes = await store.loadAll();
+    renderAll();
+    etapa.textContent = "Concluído.";
+    resumo.textContent = `${mg.length} rodoviárias em MG · ${novos} novas · ${ja} já no controle`;
+  } catch (e) {
+    console.error(e);
+    etapa.textContent = "Erro na atualização.";
+    log("\nERRO: " + (e.message || e));
+    toast(e.message || "Erro ao atualizar do DNIT.", true);
+  } finally {
+    fechar.disabled = false;
+  }
+}
+
 async function atualizarAlerta() {
   if (!requireUnlock()) return;
   const token = obterTokenAlerta();
@@ -5205,6 +5295,7 @@ document.getElementById("m-excluir").addEventListener("click", excluirAtual);
 document.getElementById("btn-add").addEventListener("click", () => abrirModal(null));
 document.getElementById("btn-pncp").addEventListener("click", atualizarPncp);
 document.getElementById("btn-alerta").addEventListener("click", atualizarAlerta);
+document.getElementById("btn-dnit").addEventListener("click", atualizarDnit);
 document.getElementById("pncp-fechar").addEventListener("click", () => document.getElementById("modal-pncp").classList.remove("open"));
 document.getElementById("btn-export").addEventListener("click", exportarExcel);
 document.getElementById("btn-lixeira").addEventListener("click", () => {
