@@ -1904,7 +1904,7 @@ const SERVICOS_LM = [
   { nome: "Tapa-buracos", rx: /tapa\s*-?\s*buracos?/, alta: true },
   { nome: "Fresagem", rx: /fresagem/, alta: true },
   { nome: "Pavimentação", rx: /pavimenta/, alta: false },
-  { nome: "Conservação / manutenção / melhoria de vias e estradas", rx: /(conserva|manuten|recupera|melhoria|reforma|readequa|restaura)\w* (d[aeo]s? |de |em |nas? )?(malha viaria|vias?|estradas?|rodovias?|ruas?|vicinais?|logradouros?|pistas? de rolamento)\b/, alta: false },
+  { nome: "Conservação / manutenção / melhoria de vias e estradas", rx: /(conserva|manuten|recupera|melhoria|reforma|readequa|restaura)\w* (d[aeo]s? |de |em |nas? )?(malha viaria|vias?|estradas?|rodovias?|rodoviariw*|ruas?|vicinais?|logradouros?|pistas? de rolamento)\b/, alta: false },
 ];
 function servicosLm(texto) { return SERVICOS_LM.filter(s => s.rx.test(texto)); }
 function classificar(objeto) {
