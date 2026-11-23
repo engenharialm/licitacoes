@@ -1907,8 +1907,22 @@ const SERVICOS_LM = [
   { nome: "Conservação / manutenção / melhoria de vias e estradas", rx: /(conserva|manuten|recupera|melhoria|reforma|readequa|restaura)\w* (d[aeo]s? |de |em |nas? )?(malha viaria|vias?|estradas?|rodovias?|rodoviariw*|ruas?|vicinais?|logradouros?|pistas? de rolamento)\b/, alta: false },
 ];
 function servicosLm(texto) { return SERVICOS_LM.filter(s => s.rx.test(texto)); }
-function classificar(objeto) {
+// DNIT e DER-MG/DEER-MG: prioridade da LM. Qualquer obra/serviço rodoviário deles entra (exceto projeto,
+// supervisão, consultoria, compra de material e veículos), com prioridade alta.
+const RX_ORGAO_RODOVIARIO = /departamento nacional de infra|\bdnit\b|estradas de rodagem|\bder\s*-?\s*mg\b|\bdeer\b/;
+const RX_SERV_RODOVIARIO = /rodovi|\bbr\s*-?\s*\d{3}|\b(a?mg|lmg|cmg)\s*-?\s*\d{2,3}|estradas?|pavimen|asfalt|conserva|manuten|restaura|recupera|sinaliza|drenagem|\bpontes?\b|viadut|obras?|duplica|implanta|acostamento|contorno|travessia|faixa de dominio|rocada|capina|recomposi/;
+function orgaoRodoviario(orgao) { return RX_ORGAO_RODOVIARIO.test(norm(orgao)); }
+function classificar(objeto, orgao) {
   const n = norm(objeto).replace(RX.neutro, " ");
+  if (orgao && orgaoRodoviario(orgao) && RX_SERV_RODOVIARIO.test(n) && !RX.excluir.test(n)
+      && !(RX.tec.test(n) && !/integrada/.test(n)) && !ehAquisicaoMaterial(objeto)) {
+    const sigla = /estradas de rodagem|\bder|\bdeer/.test(norm(orgao)) ? "DER-MG" : "DNIT";
+    const nomes = servicosLm(n).map(s => s.nome);
+    return { pav: true, ter: RX.ter.test(n), dre: RX.dre.test(n), asfalto: RX.asf.test(n),
+      chave: n.replace(/^\s*\[[^\]]*\]\s*-?\s*/, "").replace(/[^a-z0-9]/g, ""),
+      motivo: "Órgão prioritário (" + sigla + ")" + (nomes.length ? ": " + nomes.join(", ") : ": obra/serviço rodoviário"),
+      prioridade: "alta" };
+  }
   const pavExtra = ((RX.pavimento.test(n) && RX.via.test(n)) || RX.viario.test(n)) && !RX.predio.test(n);
   const achados = servicosLm(n);
   // conservação/manutenção de vias de prédio ("reforma da escola ... vias de acesso") não conta
@@ -3343,7 +3357,7 @@ async function atualizarPncp() {
       return (a.it.dataPublicacaoPncp || "") > (b.it.dataPublicacaoPncp || "");
     };
     for (const it of coletados.values()) {
-      const c = classificar(it.objetoCompra);
+      const c = classificar(it.objetoCompra, (it.orgaoEntidade?.razaoSocial || "") + " " + (it.unidadeOrgao?.nomeUnidade || ""));
       if (!c) continue;
       if (it.dataEncerramentoProposta && it.dataEncerramentoProposta < agora) continue;
       const id = docId(it);
@@ -3517,7 +3531,7 @@ async function atualizarAlerta() {
     let novos = 0, duplicadas = 0, relevantes = 0;
 
     for (const it of coletadas.values()) {
-      const c = classificar(it.objeto);
+      const c = classificar(it.objeto, it.orgao || "");
       if (!c) continue;
       const abertura = (it.abertura_datetime || "").replace(" ", "T");
       if (abertura && abertura.slice(0, 10) < hoje) continue;
