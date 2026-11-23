@@ -1706,7 +1706,8 @@ const store = {
     if (useFirebase) {
       return withTimeout(async () => {
         const snap = await fs.getDocs(fs.collection(db, COL_NAME));
-        return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        // uma licitação = um registro: cópias marcadas com duplicadaDe ficam fora do controle
+        return snap.docs.map(d => ({ id: d.id, ...d.data() })).filter(l => !l.duplicadaDe);
       });
     }
     return lsRead();
@@ -3379,6 +3380,8 @@ async function atualizarPncp() {
       vistos.add(id);
       const pncp = montarPncp(it, c, n);
       const atual = existentes.get(id);
+      const copia = !atual && jaNoControle({ objeto: pncp.objeto, orgao: pncp.orgao, cidade: pncp.cidade, numero: pncp.numero, data: pncp.dataEncerramento });
+      if (copia) { log(`já no controle (${copia.id}): ${pncp.orgao} ${pncp.numero}`); continue; }
       if (!atual) {
         novos++;
         entries.push({ id, data: {
@@ -3481,6 +3484,26 @@ function similaridade(a, b) {
 }
 function municipioChave(s) { return norm(s).replace(/\(.*?\)/g, "").replace(/[^a-z]/g, ""); }
 
+// ===== uma licitação = um registro (mesma regra de scripts/duplicidade.py) =====
+const DUP_PARAR = new Set(["contratacao","empresa","especializada","execucao","servicos","municipio","prefeitura","municipal","conforme","edital","anexos","objeto","para","com","minas","gerais","estado","obras","obra"]);
+function dupPalavras(s) { return new Set(norm(s).replace(/^\s*\[[^\]]*\]/, "").split(/[^a-z0-9]+/).filter(w => w.length > 3 && !DUP_PARAR.has(w))); }
+function dupParecido(a, b) { a = dupPalavras(a); b = dupPalavras(b); if (!a.size || !b.size) return 0; let c = 0; for (const w of a) if (b.has(w)) c++; return c / (a.size + b.size - c); }
+function dupLugar(s) { return norm(s).replace(/\(.*?\)|municipio de |prefeitura (municipal )?de |camara municipal de /g, "").replace(/[^a-z]/g, ""); }
+function dupNumero(s) { const m = String(s || "").split("—")[0].match(/(\d+)\s*\/\s*(\d{4})/); return m ? Number(m[1]) + "/" + m[2] : ""; }
+function jaNoControle({ objeto, orgao = "", cidade = "", numero = "", data = "" }, ignorarId = "") {
+  const lo = dupLugar(orgao), lc = dupLugar(cidade), num = dupNumero(numero), dia = (data || "").slice(0, 10);
+  return licitacoes.find(l => {
+    if (l.id === ignorarId) return false;
+    const fo = dupLugar(l.orgao), fc = dupLugar(l.cidade);
+    const mesmoLugar = (lo && fo && (lo === fo || lo.includes(fo) || fo.includes(lo)) && Math.min(lo.length, fo.length) > 4) || (lc && lc === fc);
+    if (!mesmoLugar) return false;
+    const outro = dupNumero(l.numero);
+    if (num && outro && num !== outro) return false;
+    const sim = dupParecido(objeto, l.objeto);
+    return (num && outro === num && sim >= 0.15) || sim >= 0.5 || (dia && (l.dataSessao || "").slice(0, 10) === dia && sim >= 0.25);
+  }) || null;
+}
+
 // ===== DNIT: consulta oficial de editais (a mesma lista de gov.br/dnit/.../editais-de-licitacoes) =====
 // Mesmas regras do robô scripts/dnit.py: Superintendência de MG, obra/serviço rodoviário, prioridade alta.
 const DNIT_LISTA = "https://www1.dnit.gov.br/editais/consulta/lista.asp";
@@ -3533,7 +3556,7 @@ async function atualizarDnit() {
       const nomes = servicosLm(norm(objeto)).map(s => s.nome);
       const triagem = { motivo: "Órgão prioritário (DNIT)" + (nomes.length ? ": " + nomes.join(", ") : ": obra/serviço rodoviário"), prioridade: "alta", fonte: "DNIT", linkDnit: link };
       const suspensa = e.status === "EDITAL SUSPENSO";
-      const atual = licitacoes.find(l => l.id === id || (/dnit|infraest/.test(norm(l.orgao)) && new RegExp(`^0*${seq}/${ano}$`).test((l.numero || "").split("—")[0].trim())));
+      const atual = licitacoes.find(l => l.id === id || (/dnit|infraest/.test(norm(l.orgao)) && new RegExp(`^0*${seq}/${ano}$`).test((l.numero || "").split("—")[0].trim()))) || jaNoControle({ objeto, orgao: "DNIT", cidade: "Belo Horizonte", numero: `${seq}/${ano}` });
       if (atual) {
         ja++;
         entries.push({ id: atual.id, data: { triagem: { ...(atual.triagem || {}), ...triagem }, ...(suspensa ? { suspensa: true } : {}), atualizadoEm: lote } });
@@ -3599,7 +3622,7 @@ async function atualizarDer() {
       const [, seq, ano] = (e.numero || "").match(/0*(\d+)\/(\d{4})/) || [];
       const nomes = servicosLm(norm(e.objeto)).map(s => s.nome);
       const triagem = { motivo: "Órgão prioritário (DER-MG)" + (nomes.length ? ": " + nomes.join(", ") : ": obra/serviço rodoviário"), prioridade: "alta", fonte: "DER-MG", linkDer: e.link };
-      const atual = licitacoes.find(l => l.id === id || (seq && /estradas de rodagem|\bder\b|\bdeer\b/.test(norm(l.orgao)) && new RegExp(`\b0*${seq}/${ano}\b`).test(l.numero || "")));
+      const atual = licitacoes.find(l => l.id === id || (seq && /estradas de rodagem|\bder\b|\bdeer\b/.test(norm(l.orgao)) && new RegExp(`\b0*${seq}/${ano}\b`).test(l.numero || ""))) || jaNoControle({ objeto: e.objeto, orgao: "DER-MG estradas de rodagem", cidade: "Belo Horizonte", numero: e.numero, data: e.data });
       if (atual) { ja++; entries.push({ id: atual.id, data: { triagem: { ...(atual.triagem || {}), ...triagem }, atualizadoEm: lote } }); continue; }
       novos++;
       entries.push({ id, data: {
@@ -3691,6 +3714,8 @@ async function atualizarAlerta() {
       const nPncp = String(it.id_licitacao).match(/PNCP-(\d{14})-\d-0*(\d+)-(\d{4})/);
       const jaPeloPncp = nPncp && idsPortal.has(`pncp_${nPncp[1]}-1-${nPncp[2].padStart(6, "0")}_${nPncp[3]}`);
       if (jaPeloPncp || outras.some(o => igual(o) || mesmoDia(o))) { duplicadas++; continue; }
+      const copiaAl = jaNoControle({ objeto: it.objeto, orgao: it.orgao, cidade: it.municipio, numero: it.titulo, data: abertura }, "alerta_" + String(it.id_licitacao).replace(/[^\w-]/g, "_"));
+      if (copiaAl) { duplicadas++; continue; }
       if (vistasNoAlerta.some(igual)) continue;
       vistasNoAlerta.push({ mun, dia, pal });
       relevantes++;

@@ -215,11 +215,28 @@ def campo(v):
     return h.campo(v)
 
 
+_CONTROLE = None
+
+
 def gravar(colecao, id_, dados):
+    """Grava no Firestore. Registro NOVO no controle passa antes pela regra de duplicidade (uma licitação = um registro)."""
+    global _CONTROLE
+    if colecao == "licitacoes" and "criadoEm" in dados:
+        import duplicidade
+        if _CONTROLE is None:
+            _CONTROLE = dict(h.licitacoes())
+        if id_ not in _CONTROLE:
+            copia = duplicidade.ja_existe(_CONTROLE, dados.get("objeto") or "", dados.get("orgao") or "", dados.get("cidade") or "",
+                                          dados.get("numero"), dados.get("dataSessao"))
+            if copia:
+                print(f"   não lançada: já está no controle como {copia}")
+                return False
+        _CONTROLE[id_] = dados
     if "--teste" in sys.argv:   # só mostra o que faria, sem gravar
-        return
+        return True
     corpo = json.dumps({"fields": {k: campo(v) for k, v in dados.items()}}).encode()
     h.http(f"{h.DOCS}/{colecao}/{id_}?key={h.CHAVE}", "PATCH", corpo)
+    return True
 
 
 def main():
