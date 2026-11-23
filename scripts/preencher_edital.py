@@ -62,7 +62,7 @@ def main():
         if not link or l.get("duplicadaDe") or (l.get("dataSessao") or "9")[:16] < agora:
             continue
         de = l.get("dadosEdital") or {}
-        if de.get("versao") == VERSAO and "--todas" not in sys.argv:
+        if isinstance(de, dict) and de.get("versao") == VERSAO and "--todas" not in sys.argv:
             continue
         try:
             texto, lidos = textos_do_processo(link)
@@ -74,7 +74,10 @@ def main():
         dados = {}
         if x:
             pct = x.get("garantiaPct")
-            valor = l.get("valor")
+            try:
+                valor = float(l.get("valor") or 0) or None
+            except (TypeError, ValueError):
+                valor = None
             if x["garantia"] == "não exigida":
                 gar = "Não exigida no edital"
             elif pct and valor:
@@ -96,7 +99,9 @@ def main():
             dados["dadosEdital"] = {"versao": VERSAO, "lidos": 0, "conferir": True}
         print(f"{(l.get('cidade') or '')[:28]:28} | {dados.get('garantiaProposta', '-')[:55]:55} | {dados.get('atestados', '-')[:90]}")
         if "--teste" not in sys.argv:
-            h.gravar(doc_id, dados)
+            mascara = "&".join(f"updateMask.fieldPaths={k}" for k in dados)
+            corpo = json.dumps({"fields": {k: t.campo(v) for k, v in dados.items()}}).encode()
+            h.http(f"{h.DOCS}/licitacoes/{doc_id}?key={h.CHAVE}&{mascara}", "PATCH", corpo)
         feitos += 1
     print(f"{feitos} licitações preenchidas")
 
