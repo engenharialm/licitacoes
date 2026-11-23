@@ -1,6 +1,7 @@
 # Robô do controle de licitações, 3 vezes por dia (também dá para rodar na hora em Actions → "Horário da disputa" → Run workflow):
 #  1. scripts/triagem_documentos.py — lê edital/TR/planilhas das obras viárias que o objeto não denuncia
 #     (subleito, base/sub-base, BGS, imprimação, CBUQ...) e inclui as oportunidades no controle;
+#  0. scripts/dnit.py — editais da consulta oficial do DNIT (Superintendência de MG), prioridade alta;
 #  2. scripts/horario_disputa.py — lê o horário da disputa nos editais e grava no controle.
 name: Horário da disputa
 
@@ -19,6 +20,10 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install pypdf==5.1.0 openpyxl==3.1.5
+      - name: Editais do DNIT (MG)
+        working-directory: scripts
+        run: python dnit.py
+        continue-on-error: true
       - name: Triagem pelos documentos
         working-directory: scripts
         run: python triagem_documentos.py
