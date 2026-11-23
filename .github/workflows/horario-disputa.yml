@@ -1,28 +1,46 @@
-# Robô do controle de licitações, 3 vezes por dia (também dá para rodar na hora em Actions → "Horário da disputa" → Run workflow):
-#  1. scripts/triagem_documentos.py — lê edital/TR/planilhas das obras viárias que o objeto não denuncia
-#     (subleito, base/sub-base, BGS, imprimação, CBUQ...) e inclui as oportunidades no controle;
-#  0. scripts/dnit.py — editais da consulta oficial do DNIT (Superintendência de MG), prioridade alta;
-#  2. scripts/horario_disputa.py — lê o horário da disputa nos editais e grava no controle.
+# Robô do controle de licitações, às 06:30, 12:30 e 18:00 (Brasília). O GitHub pode atrasar alguns minutos.
+# Também dá para rodar na hora em Actions → "Horário da disputa" → Run workflow.
+#  1. PNCP           — scripts/pncp_robo.py   (mesma busca do botão "Atualizar do PNCP")
+#  2. Alerta         — scripts/alerta_robo.py (precisa do segredo ALERTA_TOKEN; sem ele, é pulado)
+#  3. DNIT           — scripts/dnit.py        (consulta oficial de editais do DNIT, Superintendência de MG)
+#  4. DER-MG         — scripts/der.py         (concorrências de der.mg.gov.br)
+#  depois: triagem_documentos.py (lê edital/TR/planilhas das obras que o objeto não denuncia)
+#          horario_disputa.py    (lê o horário da disputa nos editais)
 name: Horário da disputa
 
 on:
   schedule:
-    - cron: "0 10,15,21 * * *"   # 07h, 12h e 18h em Brasília
+    - cron: "30 9,15 * * *"   # 06:30 e 12:30 em Brasília
+    - cron: "0 21 * * *"      # 18:00 em Brasília
   workflow_dispatch:
 
 jobs:
   ler-editais:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
       - run: pip install pypdf==5.1.0 openpyxl==3.1.5
+      - name: PNCP
+        working-directory: scripts
+        run: python pncp_robo.py
+        continue-on-error: true
+      - name: Alerta Licitação
+        working-directory: scripts
+        run: python alerta_robo.py
+        env:
+          ALERTA_TOKEN: ${{ secrets.ALERTA_TOKEN }}
+        continue-on-error: true
       - name: Editais do DNIT (MG)
         working-directory: scripts
         run: python dnit.py
+        continue-on-error: true
+      - name: Concorrências do DER-MG
+        working-directory: scripts
+        run: python der.py
         continue-on-error: true
       - name: Triagem pelos documentos
         working-directory: scripts

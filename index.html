@@ -795,6 +795,7 @@
       <button class="btn btn-accent" id="btn-pncp">⟳ Atualizar do PNCP</button>
       <button class="btn btn-accent" id="btn-alerta" title="Busca no Alerta Licitação (pede a chave da API na primeira vez)">⟳ Atualizar do Alerta</button>
       <button class="btn btn-accent" id="btn-dnit" title="Busca na consulta oficial de editais do DNIT (Superintendência de MG)">⟳ Atualizar DNIT</button>
+      <button class="btn btn-accent" id="btn-der" title="Concorrências do DER-MG (der.mg.gov.br), lidas pelo robô">⟳ Atualizar DER</button>
     </div>
   </header>
 
@@ -3569,6 +3570,62 @@ async function atualizarDnit() {
   }
 }
 
+// ===== DER-MG: concorrências de der.mg.gov.br/transparencia/licitacoes/concorrencias-AAAA =====
+// O site do DER não deixa o navegador ler direto; o robô (scripts/der.py, 06:30, 12:30 e 18:00) lê a página
+// e guarda a lista em fontes/der. Este botão inclui no controle as de interesse dessa lista.
+async function atualizarDer() {
+  if (!requireUnlock()) return;
+  const modal = document.getElementById("modal-pncp"), etapa = document.getElementById("pncp-etapa");
+  const bar = document.getElementById("pncp-bar"), logEl = document.getElementById("pncp-log");
+  const fechar = document.getElementById("pncp-fechar"), resumo = document.getElementById("pncp-resumo");
+  logEl.textContent = ""; resumo.textContent = ""; bar.style.width = "0"; fechar.disabled = true;
+  document.getElementById("pncp-titulo").textContent = "Atualizando do DER-MG";
+  document.getElementById("pncp-nota").textContent = "Concorrências do site do DER-MG (der.mg.gov.br). A página é lida pelo robô às 06:30, 12:30 e 18:00; aqui entram no controle as obras e serviços rodoviários abertos, com prioridade alta. Supervisão, projetos e consultoria ficam de fora.";
+  modal.classList.add("open");
+  const log = msg => { logEl.textContent += msg + "\n"; logEl.scrollTop = logEl.scrollHeight; };
+  try {
+    etapa.textContent = "Lendo a lista do DER-MG...";
+    const snap = await fs.getDoc(fs.doc(db, "fontes", "der"));
+    if (!snap.exists()) throw new Error("O robô ainda não leu o site do DER-MG.");
+    const fonteDer = snap.data();
+    log(`Lista lida do site do DER-MG em ${new Date(fonteDer.em).toLocaleString("pt-BR")}.`);
+    const hoje = localIso(new Date()).slice(0, 10);
+    const abertas = (fonteDer.abertas || []).filter(e => (e.data || "").slice(0, 10) >= hoje);
+    const lote = new Date().toISOString(), entries = [];
+    let novos = 0, ja = 0, fora = 0;
+    for (const e of abertas) {
+      if (!e.interessa) { fora++; log(`fora do perfil: ${e.numero} — ${e.objeto.slice(0, 80)}`); continue; }
+      const id = "der_" + e.id;
+      const [, seq, ano] = (e.numero || "").match(/0*(\d+)\/(\d{4})/) || [];
+      const nomes = servicosLm(norm(e.objeto)).map(s => s.nome);
+      const triagem = { motivo: "Órgão prioritário (DER-MG)" + (nomes.length ? ": " + nomes.join(", ") : ": obra/serviço rodoviário"), prioridade: "alta", fonte: "DER-MG", linkDer: e.link };
+      const atual = licitacoes.find(l => l.id === id || (seq && /estradas de rodagem|\bder\b|\bdeer\b/.test(norm(l.orgao)) && new RegExp(`\b0*${seq}/${ano}\b`).test(l.numero || "")));
+      if (atual) { ja++; entries.push({ id: atual.id, data: { triagem: { ...(atual.triagem || {}), ...triagem }, atualizadoEm: lote } }); continue; }
+      novos++;
+      entries.push({ id, data: {
+        origem: "DER", dataSessao: e.data, orgao: "DER-MG — Departamento de Estradas de Rodagem de Minas Gerais",
+        cidade: "Belo Horizonte (sede do órgão)", numero: e.numero, modalidade: e.modalidade, objeto: e.objeto, valor: e.valor ?? null,
+        linkPortal: e.link, interesse: null, status: "", servicos: [], atestados: "", observacao: "", garantiaProposta: "",
+        vencedora: "", camposEditados: [], lote, criadoEm: lote, atualizadoEm: lote, triagem, suspensa: !!e.suspensa
+      }});
+      log(`NOVA: ${e.numero} — ${e.objeto.slice(0, 90)}`);
+    }
+    bar.style.width = "100%";
+    if (entries.length) await store.saveMany(entries);
+    licitacoes = await store.loadAll();
+    renderAll();
+    etapa.textContent = "Concluído.";
+    resumo.textContent = `${abertas.length} abertas no DER-MG · ${novos} novas · ${ja} já no controle · ${fora} fora do perfil`;
+  } catch (e) {
+    console.error(e);
+    etapa.textContent = "Erro na atualização.";
+    log("\nERRO: " + (e.message || e));
+    toast(e.message || "Erro ao atualizar do DER-MG.", true);
+  } finally {
+    fechar.disabled = false;
+  }
+}
+
 async function atualizarAlerta() {
   if (!requireUnlock()) return;
   const token = obterTokenAlerta();
@@ -5296,6 +5353,7 @@ document.getElementById("btn-add").addEventListener("click", () => abrirModal(nu
 document.getElementById("btn-pncp").addEventListener("click", atualizarPncp);
 document.getElementById("btn-alerta").addEventListener("click", atualizarAlerta);
 document.getElementById("btn-dnit").addEventListener("click", atualizarDnit);
+document.getElementById("btn-der").addEventListener("click", atualizarDer);
 document.getElementById("pncp-fechar").addEventListener("click", () => document.getElementById("modal-pncp").classList.remove("open"));
 document.getElementById("btn-export").addEventListener("click", exportarExcel);
 document.getElementById("btn-lixeira").addEventListener("click", () => {

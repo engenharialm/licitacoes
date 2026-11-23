@@ -1,0 +1,60 @@
+"""Mesma busca do botão "Atualizar do PNCP", feita pelo robô 3 vezes ao dia: licitações abertas em MG cujo objeto
+já mostra pavimentação/obra viária (ou de DNIT/DER-MG) entram no controle. Não mexe nas que já existem.
+
+Uso: python pncp_robo.py          (grava)
+     python pncp_robo.py --teste  (só mostra)
+"""
+import re
+from datetime import datetime, timedelta, timezone
+
+import horario_disputa as h
+import triagem_documentos as t
+from dnit import RX_FORA, RX_RODOVIARIO
+
+RX_CALC = re.compile(r"calcamento|bloquete|intertravad|sextavad|paralelep|polied|\bpedra\b|blocos? de concreto")
+RX_ASF = re.compile(r"asfalt|cbuq|betuminoso|recapeamento|microrrevestimento|tratamento superficial|\btsd\b|\bpmf\b|tapa\s*-?\s*buracos?|fresagem")
+RX_ORGAO = re.compile(r"departamento nacional de infra|\bdnit\b|estradas de rodagem|\bder\s*-?\s*mg\b|\bdeer\b")
+
+
+def classificar(objeto, orgao):
+    n = h.norm(objeto)
+    if t.eh_aquisicao_material(n) or t.RX_EXCLUIR.search(n):
+        return None
+    if RX_ORGAO.search(h.norm(orgao)) and RX_RODOVIARIO.search(n) and not RX_FORA.search(n):
+        nomes = [s[0] for s in t.SERVICOS_LM if s[1].search(n)]
+        sigla = "DNIT" if re.search(r"infra|dnit", h.norm(orgao)) else "DER-MG"
+        return f"Órgão prioritário ({sigla})" + (": " + ", ".join(nomes) if nomes else ": obra/serviço rodoviário"), "alta"
+    if not t.objeto_aceito_pelo_site(n) or (RX_CALC.search(n) and not RX_ASF.search(n)):
+        return None
+    servicos = [s for s in t.SERVICOS_LM if s[1].search(n) and (s[2] or not t.RX_PREDIO.search(n))]
+    nomes = [s[0] for s in servicos] or ["Pavimentação / obra viária"]
+    alta = any(s[2] for s in servicos) or t.RX_PAV.search(n)
+    return "Objeto: " + ", ".join(nomes), "alta" if alta else "normal"
+
+
+def main():
+    agora = datetime.now(timezone(timedelta(hours=-3))).strftime("%Y-%m-%dT%H:%M")
+    itens = [it for it in t.abertas_mg() if (it.get("dataEncerramentoProposta") or "9")[:16] >= agora]
+    ids = {i for i, _ in h.licitacoes()}
+    grupos = {}
+    for it in itens:
+        org = (it.get("orgaoEntidade") or {}).get("razaoSocial", "") + " " + (it.get("unidadeOrgao") or {}).get("nomeUnidade", "")
+        c = classificar(it.get("objetoCompra") or "", org)
+        if not c:
+            continue
+        chave = it["orgaoEntidade"]["cnpj"] + "|" + re.sub(r"[^a-z0-9]", "", h.norm(re.sub(r"^\s*\[[^\]]*\]", "", it.get("objetoCompra") or "")))
+        g = grupos.setdefault(chave, [])
+        g.append((it, c))
+    novas = 0
+    for g in grupos.values():
+        if any(t.doc_id(it) in ids for it, _ in g):
+            continue   # já está no controle (alguma das publicações)
+        it, (motivo, prio) = max(g, key=lambda x: x[0].get("dataPublicacaoPncp") or "")
+        print(f"INCLUÍDA: {it['orgaoEntidade'].get('razaoSocial')} — {it.get('numeroCompra')}/{it.get('anoCompra')} | {motivo}")
+        t.gravar("licitacoes", t.doc_id(it), t.registro_pncp(it, motivo, prio, {"motivo": motivo, "prioridade": prio, "fonte": "PNCP (robô)"}))
+        novas += 1
+    print(f"{len(itens)} abertas em MG no PNCP; {novas} novas incluídas")
+
+
+if __name__ == "__main__":
+    main()
