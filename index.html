@@ -1983,18 +1983,13 @@ function isAtiva(l) {
   return !l.dataSessao || l.dataSessao >= localIso(new Date());
 }
 /* ------------------------------ regiões de interesse ------------------------------ */
+// distâncias medidas a partir das usinas de asfalto da LM e da usina parceira (rota por estrada, OpenStreetMap)
 const REGIOES_PADRAO = [
-  { ibge: "3168606", cidade: "Teófilo Otoni", raio: 100 },
-  { ibge: "3167202", cidade: "Sete Lagoas", raio: 100 },
-  { ibge: "3168101", cidade: "Tapira", raio: 100 },
-  { ibge: "3125705", cidade: "Felixlândia", raio: 100 },
-  { ibge: "3135209", cidade: "Januária", raio: 100 },
-  { ibge: "3142007", cidade: "Mirabela", raio: 100 },
-  { ibge: "3157906", cidade: "Santa Margarida", raio: 100 },
-  { ibge: "3118601", cidade: "Contagem", raio: 100 },
-  { ibge: "3118304", cidade: "Conselheiro Lafaiete", raio: 100 },
-  { ibge: "3138203", cidade: "Lavras", raio: 100 },
-  { ibge: "3113701", cidade: "Carlos Chagas", raio: 100 }
+  { ibge: "3125705", cidade: "Felixlândia", rotulo: "Usina de Felixlândia", raio: 100 },
+  { ibge: "3168606", cidade: "Teófilo Otoni", rotulo: "Usina de Teófilo Otoni", raio: 100 },
+  { ibge: "3138203", cidade: "Lavras", rotulo: "Usina de Lavras", raio: 100 },
+  { ibge: "3118601", cidade: "Contagem", rotulo: "Usina de Contagem", raio: 100 },
+  { ibge: "3154408", cidade: "Ressaquinha", rotulo: "Usina parceira de Ressaquinha", raio: 100 }
 ];
 let municipios = {};          // ibge -> [nome, lat, lon]
 let municipioPorNome = {};    // nome normalizado -> ibge
@@ -2120,7 +2115,7 @@ function regiaoDe(l) {
       const reta = rota == null;
       const d = reta ? distanciaKm(m, base) : rota;
       const folga = d - r.raio;
-      if (!melhor || folga < melhor.folga) melhor = { d, folga, base: r.cidade, reta };
+      if (!melhor || folga < melhor.folga) melhor = { d, folga, base: r.rotulo || r.cidade, reta };
     }
   }
   const info = melhor ? { km: Math.round(melhor.d), base: melhor.base, dentro: melhor.folga <= 0, reta: melhor.reta } : null;
@@ -2141,7 +2136,7 @@ function renderRegiaoBar() {
   const dentro = ativas.filter(l => { const r = regiaoDe(l); return r && r.dentro; }).length;
   const indef = ativas.filter(l => !regiaoDe(l)).length;
   document.getElementById("regiao-resumo").textContent =
-    `${dentro} de ${ativas.length} licitações (pendentes + SIM) estão a até o raio de: ${regioes.map(r => `${r.cidade} ${r.raio} km`).join(", ")}` +
+    `${dentro} de ${ativas.length} licitações (pendentes + SIM) estão a até o raio de: ${regioes.map(r => `${r.rotulo || r.cidade} ${r.raio} km`).join(", ")}` +
     (indef ? ` · ${indef} sem município definido (local a conferir)` : "");
 }
 function regiaoHtml(l) {
@@ -2174,7 +2169,7 @@ async function salvarRegioes() {
     const ibge = municipioPorNome[norm(nome)];
     if (!ibge) { toast(`Cidade não encontrada em MG: "${nome}". Escolha da lista.`, true); return; }
     if (!(raio > 0)) { toast(`Informe o raio em km para ${nome}.`, true); return; }
-    lista.push({ ibge, cidade: municipios[ibge][0], raio });
+    lista.push({ ibge, cidade: municipios[ibge][0], rotulo: (regioes.find(r => r.ibge === ibge) || {}).rotulo || `Usina de ${municipios[ibge][0]}`, raio });
   }
   if (!lista.length) { toast("Cadastre pelo menos uma cidade-base.", true); return; }
   if (!requireUnlock()) return;
@@ -2222,7 +2217,7 @@ async function init() {
     [licitacoes, meta, metaAlerta, metaRegioes, ganhas, metaCert, metaAt] = await Promise.all([store.loadAll(), store.getMeta("pncp"), store.getMeta("alerta"), store.getMeta("regioes"), storeGanhas.loadAll(), store.getMeta("certidoes"), store.getMeta("atestados"), carregarMunicipios(), carregarRotasArquivo()]);
     certidoes = Array.isArray(metaCert?.lista) ? metaCert.lista : [];
     atestados = Array.isArray(metaAt?.lista) ? metaAt.lista : [];
-    if (metaRegioes && Array.isArray(metaRegioes.lista) && metaRegioes.lista.length) regioes = metaRegioes.lista;
+    if (metaRegioes && Array.isArray(metaRegioes.lista) && metaRegioes.lista.length && metaRegioes.lista.some(r => r.rotulo)) regioes = metaRegioes.lista;
     carregarRotas();
     setConnStatus(true);
   } catch (e) {
